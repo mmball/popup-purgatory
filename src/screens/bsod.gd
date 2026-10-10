@@ -28,11 +28,19 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Win98.BSOD_BLUE)
 	var run: RunState = Game.last_run
+	var won := run != null and run.won and run.crash_reason == "CLOCKED_OUT"
+	draw_rect(Rect2(Vector2.ZERO, size), Color.BLACK if won else Win98.BSOD_BLUE)
+	var fg := Color("ffa500") if won else Win98.WHITE
 	var lines: Array[String] = []
 	var shutdown := run != null and run.crash_reason == "SHUTDOWN"
-	if shutdown:
+	if won:
+		lines.append("It's now safe to turn off your computer.")
+		lines.append("")
+		lines.append("You clocked out at 5:00 PM on Service Pack %d. The pop-ups will be back tomorrow." % run.tier)
+		if run.tier < Ladder.max_tier():
+			lines.append("Service Pack %d is now available from the main menu." % (run.tier + 1))
+	elif shutdown:
 		lines.append("It is now safe to turn off your computer.")
 		lines.append("")
 		lines.append("(You shut the machine down yourself. The pop-ups will remember.)")
@@ -56,15 +64,23 @@ func _draw() -> void:
 		if meta != null and run.score > 0 and run.score >= meta.high_score:
 			lines.append("")
 			lines.append("  NEW HIGH SCORE")
+		for a: String in Game.last_earned:
+			var ach: Dictionary = MetaSave.ACHIEVEMENTS[a]
+			lines.append("")
+			lines.append("  UNLOCKED: %s. Added to the pool: %s" % [ach["name"], ach["adds"]])
 	lines.append("")
 	lines.append("Press any key to continue" + (" _" if fmod(_t, 1.0) < 0.5 else ""))
 
 	var y := 120.0
 	var cx := size.x * 0.5
-	var ts := Win98.text_size(" POPUP PURGATORY ", 16)
-	draw_rect(Rect2(cx - ts.x * 0.5, y - 2, ts.x, ts.y + 4), Win98.GRAY)
-	Win98.draw_text(self, Vector2(cx - ts.x * 0.5, y), " POPUP PURGATORY ", Win98.BSOD_BLUE, 16)
+	var title := " POPUP PURGATORY " if not won else " CLOCKED OUT "
+	var ts := Win98.text_size(title, 16)
+	if won:
+		Win98.draw_text(self, Vector2(cx - ts.x * 0.5, y), title, fg, 16)
+	else:
+		draw_rect(Rect2(cx - ts.x * 0.5, y - 2, ts.x, ts.y + 4), Win98.GRAY)
+		Win98.draw_text(self, Vector2(cx - ts.x * 0.5, y), title, Win98.BSOD_BLUE, 16)
 	y += 50
 	for line: String in lines:
-		Win98.draw_text(self, Vector2(160, y), line, Win98.WHITE, 15)
+		Win98.draw_text(self, Vector2(160, y), line, fg, 15)
 		y += 24

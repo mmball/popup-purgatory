@@ -16,6 +16,9 @@ const DEFS := {
 	"click_bonus": {"name": "Mouse Blessing", "desc": "+1 byte per pop-up you close yourself.", "max": 3},
 	"antivirus_patch": {"name": "Hotfix KB98", "desc": "Timed-out pop-ups no longer multiply.", "max": 1},
 	"bytes_now": {"name": "Found Change", "desc": "+40 bytes right now.", "max": 99},
+	"consent_manager": {"name": "Consent Manager", "desc": "Cookie banners come pre-rejected: one click completes them.", "max": 1, "unlock": "clock_out"},
+	"do_not_disturb": {"name": "Do Not Disturb", "desc": "Live Chat widgets appear half as often.", "max": 1, "unlock": "hundred_closed"},
+	"garbage_collector": {"name": "Garbage Collector", "desc": "Memory leaks grow half as fast.", "max": 1, "unlock": "dojo_built"},
 }
 
 
@@ -33,6 +36,8 @@ static func eligible(run: RunState) -> Array[String]:
 		if picked >= int(DEFS[id]["max"]):
 			continue
 		if id == "antivirus_patch" and not run.timeouts_multiply:
+			continue
+		if DEFS[id].has("unlock") and not (str(DEFS[id]["unlock"]) in run.unlocked_upgrades):
 			continue
 		out.append(id)
 	return out
@@ -79,4 +84,10 @@ static func apply(id: String, run: RunState) -> String:
 			run.timeouts_multiply = false
 		"bytes_now":
 			run.add_bytes(40)
+		"consent_manager":
+			run.consent_manager = true
+		"do_not_disturb":
+			run.chat_spawn_mult *= 0.5
+		"garbage_collector":
+			run.leak_growth_mult *= 0.5
 	return ""

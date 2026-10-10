@@ -30,16 +30,17 @@ func next_interval(wave: int, interval_mult: float = 1.0) -> float:
 	return base_interval(wave) * maxf(0.1, interval_mult) * jitter
 
 
-## Weighted pick among the types unlocked by this wave.
-func pick_type(wave: int) -> String:
-	var ids := PopupCatalog.available_on_wave(wave)
+## Weighted pick among the types available on this wave for this run's pool.
+## `weight_mult` maps type id -> multiplier (e.g. Do Not Disturb halves "chat").
+func pick_type(wave: int, unlocked: Array[String] = [], weight_mult: Dictionary = {}) -> String:
+	var ids := PopupCatalog.available_on_wave(wave, unlocked)
 	assert(ids.size() > 0, "No popup types available on wave %d" % wave)
 	var total := 0.0
 	for id: String in ids:
-		total += PopupCatalog.weight(id)
+		total += PopupCatalog.weight(id) * float(weight_mult.get(id, 1.0))
 	var roll := rng.randf() * total
 	for id: String in ids:
-		roll -= PopupCatalog.weight(id)
+		roll -= PopupCatalog.weight(id) * float(weight_mult.get(id, 1.0))
 		if roll <= 0.0:
 			return id
 	return ids[ids.size() - 1]

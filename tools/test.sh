@@ -22,13 +22,13 @@ if grep -E "SCRIPT ERROR|ERROR:" tests.log | grep -v -i "audio\|alsa"; then
 fi
 
 echo "== smoke run (desktop, demo mode, 600 frames)"
-"$GODOT" --headless --path . --quit-after 600 -- --screen=desktop --demo=1 --autoplay=1 --seed=1 2>&1 | tee smoke.log
+"$GODOT" --headless --path . --quit-after 600 -- --screen=desktop --demo=1 --autoplay=1 --seed=1 --fresh-meta 2>&1 | tee smoke.log
 if grep -E "SCRIPT ERROR|ERROR:" smoke.log | grep -v -i "audio\|alsa"; then
   echo "smoke run reported errors"; exit 1
 fi
 echo "== determinism (two seeded fixed-fps bot runs must end in the same state)"
 for i in 1 2; do
-  "$GODOT" --headless --fixed-fps 60 --path . --quit-after 900 -- --screen=desktop --autoplay=1 --seed=7 2>&1 \
+  "$GODOT" --headless --fixed-fps 60 --path . --quit-after 900 -- --screen=desktop --autoplay=1 --seed=7 --fresh-meta --no-telemetry 2>&1 \
     | grep -E "^seed=|SCRIPT ERROR" > "det_$i.log"
 done
 cat det_1.log

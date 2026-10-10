@@ -12,9 +12,17 @@ var rng: RandomNumberGenerator
 var schedule: SpawnSchedule
 var layer: Control          ## where windows are added; its rect bounds them
 var active := true
+var screensaver := false     ## Screensaver building: periodic spawn pause
+const SCREENSAVER_PERIOD := 30.0
+const SCREENSAVER_PAUSE := 6.0
 
 var _timer := 1.5
 var _queued: Array[Dictionary] = []
+var _saver_clock := 0.0
+
+
+func screensaver_active() -> bool:
+	return screensaver and fmod(_saver_clock, SCREENSAVER_PERIOD) >= SCREENSAVER_PERIOD - SCREENSAVER_PAUSE
 
 
 func setup(p_run: RunState, p_rng: RandomNumberGenerator, p_layer: Control) -> void:
@@ -35,9 +43,12 @@ func _process(delta: float) -> void:
 			_queued.remove_at(i)
 			spawn(str(q["type"]), q["near"])
 		i -= 1
+	_saver_clock += delta
+	if screensaver_active():
+		return  # the Screensaver is on: the timer holds
 	_timer -= delta
 	if _timer <= 0.0:
-		spawn(schedule.pick_type(run.wave))
+		spawn(schedule.pick_type(run.wave, run.unlocked_popups, {"chat": run.chat_spawn_mult}))
 		_timer = schedule.next_interval(run.wave, run.interval_mult)
 
 
@@ -49,7 +60,7 @@ func queue(type_id: String, delay: float, near: Variant = null) -> void:
 func spawn(type_id: String, near: Variant = null) -> PopupBase:
 	var def := PopupCatalog.get_def(type_id)
 	var popup := PopupBase.new()
-	popup.setup(def, rng, run.close_button_size)
+	popup.setup(def, rng, run.close_button_size, run)
 	popup.ram_cost = run.popup_cost(def)
 	popup.drag_bounds = Rect2(Vector2.ZERO, layer.size)
 	popup.spawned_near = near is Vector2

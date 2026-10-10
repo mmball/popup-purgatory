@@ -6,6 +6,8 @@ extends WindowFrame
 signal closed(popup: PopupBase, completed: bool, by_imp: bool)
 signal timed_out(popup: PopupBase)
 signal trap_hit(popup: PopupBase, kind: String)
+signal leaked(popup: PopupBase, grow: int)
+signal hopped(popup: PopupBase)
 
 var def: Dictionary
 var type_id := ""
@@ -19,10 +21,14 @@ var is_closing := false
 var x_locked_until := 0.0
 var content_node: PopupContent
 var rng: RandomNumberGenerator
+var run: RunState
+var imp_cooldown := 0.0   ## seconds imps ignore this window after it hopped
+var _leak_timer := 0.0
 
 
-func setup(p_def: Dictionary, p_rng: RandomNumberGenerator, close_size: int) -> void:
+func setup(p_def: Dictionary, p_rng: RandomNumberGenerator, close_size: int, p_run: RunState = null) -> void:
 	def = p_def
+	run = p_run
 	type_id = str(def["id"])
 	rng = p_rng
 	lifetime = float(def.get("lifetime", 0.0))
@@ -38,6 +44,7 @@ func setup(p_def: Dictionary, p_rng: RandomNumberGenerator, close_size: int) -> 
 	content_node = script.new()
 	content_node.popup = self
 	content_node.rng = rng
+	content_node.run = run
 	content.add_child(content_node)
 	content_node.build()
 	content_node.completed.connect(func() -> void: complete(false))
@@ -57,10 +64,41 @@ func _process(delta: float) -> void:
 		age = 0.0
 		timeouts += 1
 		timed_out.emit(self)
+	if imp_cooldown > 0.0:
+		imp_cooldown -= delta
+	if def.has("leak"):
+		_leak_timer += delta
+		var every := float(def["leak"].get("every", 5.0))
+		if _leak_timer >= every:
+			_leak_timer -= every
+			leaked.emit(self, int(def["leak"].get("grow", 3)))
 
 
 func x_locked() -> bool:
 	return x_locked_until > 0.0
+
+
+func is_imp_proof() -> bool:
+	return bool(def.get("imp_proof", false))
+
+
+## Pop-ups punished for dismissal (cookie banner) spawn more when X-ed.
+func dismiss_spawns() -> int:
+	return int(def.get("on_dismiss", {}).get("count", 0))
+
+
+## Jump to a new spot inside `bounds` (imp-proof windows dodge imps).
+func hop(bounds: Rect2) -> void:
+	var max_x := maxf(8.0, bounds.size.x - size.x - 8.0)
+	var max_y := maxf(8.0, bounds.size.y - size.y - 8.0)
+	var p := Vector2(rng.randf_range(8.0, max_x), rng.randf_range(8.0, max_y))
+	for i in range(4):  # prefer somewhere actually far away
+		var q := Vector2(rng.randf_range(8.0, max_x), rng.randf_range(8.0, max_y))
+		if q.distance_to(position) > p.distance_to(position):
+			p = q
+	position = p.round()
+	imp_cooldown = 8.0
+	hopped.emit(self)
 
 
 func dismiss(by_imp: bool) -> void:

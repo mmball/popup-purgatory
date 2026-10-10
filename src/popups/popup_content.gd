@@ -9,6 +9,7 @@ signal misclick(kind: String)
 
 var popup: WindowFrame
 var rng: RandomNumberGenerator
+var run: RunState   ## read-only access to modifiers (consent manager etc.)
 
 
 func _init() -> void:

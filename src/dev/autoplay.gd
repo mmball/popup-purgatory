@@ -120,6 +120,13 @@ func _step_menu(menu: MainMenu) -> void:
 
 
 func _step_desktop(desktop: Desktop) -> void:
+	if desktop._clockout != null:
+		# 5 PM: batches clock out unless --overtime=1 asks to keep going.
+		var choice := "Overtime" if Game.dev.has("overtime") else "Clock out"
+		var b := _find_button(desktop._clockout, choice)
+		if b != null:
+			_click(_center(b))
+		return
 	match policy:
 		"random":
 			_step_random(desktop)
@@ -181,22 +188,24 @@ func _external_state(desktop: Desktop) -> Dictionary:
 			var entry := {"id": pid, "type": p.type_id, "age": snappedf(p.total_age, 0.1), "ram_cost": p.ram_cost,
 				"dismiss_reward": run.reward_for(p.def, false), "complete_reward": run.reward_for(p.def, true),
 				"x_locked": p.x_locked(), "lifetime": float(p.def.get("lifetime", 0.0)), "age_since_timeout": snappedf(p.age, 0.1),
-				"timeout_kind": str(p.def.get("on_timeout", {}).get("kind", "none")), "cheap_complete": _completion_control(p) != null}
+				"timeout_kind": str(p.def.get("on_timeout", {}).get("kind", "none")), "cheap_complete": _completion_control(p) != null,
+				"dismiss_spawns": p.dismiss_spawns(), "imp_proof": p.is_imp_proof(), "leak": p.def.has("leak")}
 			popups.append(entry)
 			if not p.x_locked():
 				moves.append({"id": "dismiss:%d" % pid, "kind": "dismiss", "popup": pid, "desc": "X the %s (+%d bytes)" % [p.type_id, entry["dismiss_reward"]]})
 			if _completion_control(p) != null:
 				moves.append({"id": "complete:%d" % pid, "kind": "complete", "popup": pid, "desc": "complete the %s in one click (+%d bytes)" % [p.type_id, entry["complete_reward"]]})
-		for id: String in BuildingCatalog.ORDER:
+		for id: String in BuildingCatalog.available(run.unlocked_buildings):
 			var owned := desktop.village.count(id)
-			var cost := BuildingCatalog.cost(id, owned)
+			var cost := desktop.building_cost(id, owned)
 			if owned < BuildingCatalog.max_count(id) and run.bytes >= cost and desktop.village.first_free_cell().x >= 0:
 				moves.append({"id": "build:" + id, "kind": "build", "building": id, "cost": cost, "desc": "%s (%d bytes): %s" % [BuildingCatalog.DEFS[id]["name"], cost, BuildingCatalog.DEFS[id]["desc"]]})
 	var buildings := {}
 	for id: String in BuildingCatalog.ORDER:
 		buildings[id] = desktop.village.count(id)
 	return {
-		"seq": _decision_seq, "seed": run.seed, "t": snappedf(run.elapsed, 0.1), "wave": run.wave,
+		"seq": _decision_seq, "seed": run.seed, "t": snappedf(run.elapsed, 0.1), "wave": run.wave, "tier": run.tier,
+		"workday_waves": RunState.WORKDAY_WAVES, "overtime": run.overtime,
 		"wave_time_left": snappedf(run.wave_time_left, 0.1), "in_break": run.in_break,
 		"bytes": run.bytes, "score": run.score, "ram_used": run.ram_used, "ram_max": run.ram_max,
 		"overloaded": run.overloaded, "imps": desktop.imp_manager.imps.size(), "trained": desktop.imp_manager.count_trained(),
@@ -289,10 +298,11 @@ func _step_greedy(desktop: Desktop) -> void:
 			desktop.village.cancel_place()
 		return
 	if desktop.start_menu.visible:
-		for i in range(BuildingCatalog.ORDER.size()):
-			var id: String = BuildingCatalog.ORDER[i]
+		var avail := BuildingCatalog.available(run.unlocked_buildings)
+		for i in range(avail.size()):
+			var id: String = avail[i]
 			var owned := desktop.village.count(id)
-			if owned < BuildingCatalog.max_count(id) and run.bytes >= BuildingCatalog.cost(id, owned):
+			if owned < BuildingCatalog.max_count(id) and run.bytes >= desktop.building_cost(id, owned) and i < desktop.start_menu._items.size():
 				_click(_center(desktop.start_menu._items[i]))
 				return
 		_click(Vector2(640, 400))  # click the desktop to close the menu
@@ -306,14 +316,16 @@ func _step_greedy(desktop: Desktop) -> void:
 	popups.sort_custom(func(a: PopupBase, b: PopupBase) -> bool: return a.age > b.age)
 	var p := popups[0]
 	var btn: Control = _completion_control(p)
-	if btn == null or rng.randf() < 0.3:
-		if p.x_locked():
+	if btn == null or (rng.randf() < 0.3 and p.dismiss_spawns() == 0):
+		if p.x_locked() or (p.dismiss_spawns() > 0 and btn != null):
 			return
-		btn = p.close_button
-	_click(_center(btn))
+		btn = p.close_button if p.dismiss_spawns() == 0 else btn
+	if btn != null:
+		_click(_center(btn))
 
 
-## The control that completes a pop-up cheaply, or null if it needs more steps.
+## The control that advances a pop-up toward completion, or null if the bot
+## has no recipe for it. Multi-step types return the next step's control.
 func _completion_control(p: PopupBase) -> Control:
 	match p.type_id:
 		"error":
@@ -322,6 +334,26 @@ func _completion_control(p: PopupBase) -> Control:
 			return _find_button(p, "Install")
 		"ad", "virus":
 			return _find_link(p)
+		"leak":
+			for b: Control in _find_all(p.content, _is_win98_button):
+				return b  # the single step button (3 clicks)
+		"chat":
+			var edit := _find_line_edit(p)
+			if edit != null:
+				edit.text = "hello"
+			return _find_button(p, "Send")
+		"cookie":
+			# Page 1: Manage (or Reject all with Consent Manager). Page 2: uncheck, then Confirm/Reject all.
+			var manage := _find_button(p, "Manage...")
+			if manage != null and manage.is_visible_in_tree():
+				return manage
+			var reject := _find_button(p, "Reject all")
+			if reject != null and reject.is_visible_in_tree():
+				return reject
+			for c: Control in _find_all(p.content, _is_base_button):
+				if c is CheckBox and c.button_pressed and not c.disabled:
+					return c
+			return _find_button(p, "Confirm")
 	return null
 
 
@@ -357,7 +389,7 @@ func _step_random(desktop: Desktop) -> void:
 		return  # idle tick
 	var p := popups[rng.randi_range(0, popups.size() - 1)]
 	var targets: Array[Control] = []
-	if not p.x_locked():
+	if not p.x_locked() and p.dismiss_spawns() == 0:
 		targets.append(p.close_button)
 	for c: Control in _find_all(p.content, _is_base_button):
 		if c.is_visible_in_tree() and not (c is Button and c.disabled):

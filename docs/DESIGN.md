@@ -17,22 +17,53 @@ than for dismissing them, and grow a village of imps that close them for you.
 4. **Every dark pattern you've ever seen is an enemy type.** Giant prize buttons, pre-checked
    boxes, bundled installers, scareware with a locked X. Falling for one spawns more.
 
-## Core loop (one run)
+## Core loop (one run = one workday)
 
 ```
-wave N (40s + 5s per wave)
+9 AM .. 5 PM: eight hours, one wave per hour (50s + 5s per hour, about 10 minutes)
   pop-ups spawn on a shrinking interval
   player: drag, X, or complete   ->  bytes
   imps:   walk, stand on the X, dismiss (untrained) or complete (trained)
   open pop-ups occupy RAM; > RAM max for 3s -> crash -> BSOD summary
   bytes -> Start menu -> buildings on the wallpaper
-coffee break
+coffee break between hours
   pick 1 of 3 upgrades
-wave N+1
+5 PM: clock out (a win, recorded) or stay for Overtime (endless, escalating, score only)
 ```
 
 Score is total bytes earned. Spending doesn't reduce score, so building is never a
-sacrifice; the only pressure is time and your one cursor.
+sacrifice; the only pressure is time and your one cursor. The taskbar clock shows the
+in-game time of day, so the run length is legible without a timer.
+
+### Difficulty ladder: Service Packs
+
+Opt-in from the main menu. Clocking out on SP n unlocks SP n+1. Each tier stacks on the
+ones below: SP1 spawns 15% faster, SP2 starts with 20 less RAM, SP3 doubles timeout
+multiplication, SP4 raises building costs 25%, SP5 slows imp work 25%, SP6 cuts the crash
+grace to 2 s. The tier is stamped on every telemetry row, so batches stratify by it.
+
+### Meta-progression: sideways unlocks
+
+Achievements add content to the pools. They never add stats, so a fresh profile can win
+SP0 with the same numbers a veteran has. The four starting perks bought with banked bytes
+are the only stat bonuses and are small and one-time.
+
+| achievement | how | adds to the pools |
+| --- | --- | --- |
+| Clocked Out | survive to 5 PM once | Cookie banner (pop-up), Screensaver (building), Consent Manager (upgrade) |
+| Inbox Zero | 100 pop-ups closed, lifetime | Live Chat (pop-up), Help Desk (building), Do Not Disturb (upgrade) |
+| Sensei | build an Imp Dojo | Memory Leak (pop-up), Garbage Collector (upgrade) |
+| Patched | clock out on SP2+ | nothing but the badge; SP3 to SP6 open through the ladder |
+
+### Targeted challenges
+
+Each unlockable pop-up punishes one build and has a counter in the same unlock bundle:
+
+| pop-up | targets | the punishment | the counter |
+| --- | --- | --- | --- |
+| Cookie banner | X-everything builds (Reflex Clicking, Pointer Shrine) | dismissing it spawns two more; Reject All is three clicks deep | Consent Manager makes it one click |
+| Live Chat | imp automation | hops away when an imp arrives; imps ignore it for 8 s after | Help Desk teaches imps to close it |
+| Memory Leak | RAM stacking (RAM Sticks, Memory Upgrade) | +3 RAM every 5 s until the three-step cleanup; X pays 0 | Garbage Collector halves the growth |
 
 ## Resources
 
@@ -54,9 +85,13 @@ sacrifice; the only pressure is time and your one cursor.
 | Security Check (captcha) | w3 | 12 | 1 | 8 | type 5 letters | 20s timeout: +4 RAM each time |
 | Toolbar Setup | w4 | 14 | 1 | 7 | 3-page wizard, uncheck bundle | bundle left checked: 1 ad |
 | Virus Warning | w5 | 16 | 2 | 10 | tiny "ignore warning" link | X locked 3s; SCAN spawns 2 errors; 15s timeout spawns 2 errors |
+| Cookie banner (unlock) | w2 | 9 | 1 | 7 | Manage, uncheck 3, Confirm | X spawns 2 cookies; ACCEPT ALL spawns 2 ads |
+| Live Chat (unlock) | w3 | 7 | 1 | 6 | type a reply, Send | imp-proof without a Help Desk |
+| Memory Leak (unlock) | w4 | 6 | 0 | 9 | three cleanup clicks | +3 RAM every 5 s while open |
 
 Spawn interval: `max(0.7, 2.8 - 0.25 * (wave - 1))` seconds, jittered 0.7x to 1.3x,
 scaled by the run's `interval_mult` (firewalls and the ad-blocker upgrade raise it).
+Unlockable types only enter the pool once their achievement is earned.
 
 ## Imps
 
@@ -79,6 +114,8 @@ scaled by the run's `interval_mult` (firewalls and the ad-blocker upgrade raise 
 | Firewall | 70 | 3 | spawns 15% slower |
 | Antivirus Shrine | 60 | 1 | timeouts no longer multiply |
 | Pointer Shrine | 60 | 3 | +1 byte per manual close |
+| Help Desk (unlock) | 45 | 1 | imps can close Live Chat |
+| Screensaver (unlock) | 55 | 1 | every 30 s, 6 s with no spawns |
 
 Cost grows 50% per copy owned (`cost * (1 + 0.5 * owned)`).
 
@@ -88,6 +125,7 @@ Bigger X Buttons, Memory Upgrade (+24 RAM), Espresso Shots (imp speed), Quick Ha
 work speed), Reflex Clicking (X pays double), Thoroughness (completion +50%), Ad Blocker
 trial (spawn slower), Stray Imp (free imp), Lean Windows (-2 RAM per pop-up), Mouse Blessing
 (+1 per manual close), Hotfix KB98 (no multiplication), Found Change (+40 bytes).
+Unlockable: Consent Manager, Do Not Disturb, Garbage Collector (see Targeted challenges).
 
 ## Meta-progression
 
@@ -111,6 +149,9 @@ The BSOD lists wave, bytes, closes by you vs imps, imps hired, buildings built, 
 - Numbers to watch in playtesting: starting hut cost (20), RAM base (100), the 3s grace.
 
 ## Roadmap
+
+Phases 1 to 5 of the research roadmap are done (foundation, engine 4.7, verification
+harness, telemetry and balancing tools, core loop and content). Remaining:
 
 1. **Playtest and tune** (next): human play, adjust the numbers above.
 2. **Juice**: window open/close animation, imp squash on arrival, crash screen flicker,

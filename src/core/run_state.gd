@@ -14,6 +14,8 @@ signal crashed(reason: String)
 const BASE_RAM := 100
 const OVERLOAD_GRACE := 3.0
 const BASE_CLOSE_BUTTON := 16
+const WORKDAY_WAVES := 8        ## 9 AM to 5 PM, one wave per hour
+const WORKDAY_START_HOUR := 9
 
 ## Seed for the run's RNG. -1 means randomize.
 var seed := -1
@@ -29,6 +31,14 @@ var wave := 1
 var wave_time_left := 0.0
 var in_break := false
 var elapsed := 0.0
+var won := false             ## clocked out at 5 PM
+var overtime := false        ## kept working after the win
+var tier := 0                ## Service Pack level (Ladder)
+
+# --- content pools unlocked for this run (ids); empty means catalog default ---
+var unlocked_popups: Array[String] = []
+var unlocked_buildings: Array[String] = []
+var unlocked_upgrades: Array[String] = []
 
 # --- crash state ---
 var overload_timer := 0.0
@@ -46,6 +56,13 @@ var ram_cost_reduction := 0
 var close_button_size := BASE_CLOSE_BUTTON
 var click_bonus := 0          ## extra bytes per manual close
 var timeouts_multiply := true
+var timeout_multiplier := 1      ## clones per multiply timeout (ladder raises it)
+var building_cost_mult := 1.0
+var overload_grace_override := -1.0
+var helpdesk := false            ## imps may work on imp-proof pop-ups
+var leak_growth_mult := 1.0      ## Garbage Collector halves it
+var consent_manager := false     ## cookie banners complete in one click
+var chat_spawn_mult := 1.0       ## Do Not Disturb lowers chat widget weight
 var starting_buildings: Array[String] = []
 var upgrade_counts := {}      ## upgrade id -> times picked
 
@@ -80,15 +97,42 @@ func summary() -> Dictionary:
 		"completed": popups_completed, "player_closes": player_closes, "imp_closes": imp_closes,
 		"imps_hired": imps_hired, "buildings_built": buildings_built, "buildings": buildings_list,
 		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log, "tune": Tuning.spec,
+		"tier": tier, "won": won, "overtime": overtime,
 	}
 
 
 static func wave_duration(w: int) -> float:
-	return Tuning.num("run.wave_base", 40.0) + Tuning.num("run.wave_step", 5.0) * (w - 1)
+	return Tuning.num("run.wave_base", 50.0) + Tuning.num("run.wave_step", 5.0) * (w - 1)
 
 
-static func overload_grace() -> float:
+func overload_grace() -> float:
+	if overload_grace_override > 0.0:
+		return overload_grace_override
 	return Tuning.num("run.overload_grace", OVERLOAD_GRACE)
+
+
+## True when the wave that just finished was the last hour of the workday.
+func workday_over() -> bool:
+	return not overtime and wave >= WORKDAY_WAVES and wave_time_left <= 0.0
+
+
+## Hour and minute of the in-game clock for the taskbar: wave w is hour 9+w-1.
+func clock() -> Dictionary:
+	var hour := WORKDAY_START_HOUR + wave - 1
+	var dur := wave_duration(wave)
+	var frac := 1.0 - clampf(wave_time_left / maxf(0.001, dur), 0.0, 1.0)
+	if in_break:
+		frac = 1.0
+	return {"hour": hour, "minute": int(floor(frac * 59.0))}
+
+
+func clock_out() -> void:
+	won = true
+
+
+func start_overtime() -> void:
+	overtime = true
+	start_wave(wave + 1)
 
 
 func start_wave(w: int) -> void:

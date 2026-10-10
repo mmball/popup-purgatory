@@ -12,6 +12,7 @@ var _imps: Label
 var _clock: Label
 var _tray: BevelPanel
 var _blink := 0.0
+var _run: RunState
 
 
 func _init() -> void:
@@ -33,7 +34,7 @@ func _ready() -> void:
 	add_child(box)
 	_bytes = _readout(box, "Bytes: 0", 110)
 	_ram = _readout(box, "RAM: 0/100", 130)
-	_wave = _readout(box, "Wave 1  0:40", 120)
+	_wave = _readout(box, "Hour 1/8  0:50", 150)
 	_imps = _readout(box, "Imps: 0", 120)
 
 	_tray = BevelPanel.new(true)
@@ -83,23 +84,33 @@ func _process(delta: float) -> void:
 	if Game.dev.has("clock"):
 		_clock.text = str(Game.dev["clock"])  # frozen for screenshot regression
 		return
+	if _run != null:
+		# The taskbar clock is the in-game workday: 9 AM to 5 PM, one wave per hour.
+		var c := _run.clock()
+		var h: int = c["hour"]
+		_clock.text = "%d:%02d %s" % [((h + 11) % 12) + 1, int(c["minute"]), "AM" if h < 12 else "PM"]
+		return
 	var t := Time.get_time_dict_from_system()
 	_clock.text = "%d:%02d %s" % [((int(t["hour"]) + 11) % 12) + 1, int(t["minute"]), "AM" if int(t["hour"]) < 12 else "PM"]
 
 
 func update_from(run: RunState, imp_count: int, trained: int) -> void:
+	_run = run
 	_bytes.text = "Bytes: %d" % run.bytes
 	_ram.text = "RAM: %d/%d" % [run.ram_used, run.ram_max]
 	if run.overloaded:
-		_ram.text = "RAM: LOW! %.1fs" % maxf(0.0, RunState.overload_grace() - run.overload_timer)
+		_ram.text = "RAM: LOW! %.1fs" % maxf(0.0, run.overload_grace() - run.overload_timer)
 		_ram.add_theme_color_override("font_color", Color("ff0000") if fmod(_blink, 0.4) < 0.2 else Win98.BLACK)
 	elif run.ram_fraction() > 0.8:
 		_ram.add_theme_color_override("font_color", Color("c00000"))
 	else:
 		_ram.add_theme_color_override("font_color", Win98.BLACK)
+	var label := "Hour %d/%d" % [run.wave, RunState.WORKDAY_WAVES] if not run.overtime else "Overtime %d" % (run.wave - RunState.WORKDAY_WAVES)
+	if run.tier > 0:
+		label = "SP%d " % run.tier + label
 	if run.in_break:
-		_wave.text = "Wave %d  break" % run.wave
+		_wave.text = "%s  break" % label
 	else:
 		var s := int(ceil(run.wave_time_left))
-		_wave.text = "Wave %d  %d:%02d" % [run.wave, s / 60, s % 60]
+		_wave.text = "%s  %d:%02d" % [label, s / 60, s % 60]
 	_imps.text = "Imps: %d (%d trained)" % [imp_count, trained]

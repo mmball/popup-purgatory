@@ -21,6 +21,7 @@ var telemetry := Telemetry.new()
 var _ended := false
 var _confirm: ConfirmDialog
 var _overload_logged := false
+var _clockout: ConfirmDialog
 
 
 func _ready() -> void:
@@ -108,7 +109,7 @@ func _open_telemetry() -> void:
 		var dir := str(Game.dev.get("telemetry_dir", "user://telemetry"))
 		telemetry.open_sink("%s/%d_%d.jsonl" % [dir, Time.get_unix_time_from_system(), run.seed])
 	var perks: Array[String] = Game.meta.unlocks.duplicate()
-	_log("run_start", {"seed": run.seed, "policy": str(Game.dev.get("policy", "greedy")) if Game.dev.has("autoplay") else "human", "perks": perks, "tune": Tuning.spec})
+	_log("run_start", {"seed": run.seed, "tier": run.tier, "policy": str(Game.dev.get("policy", "greedy")) if Game.dev.has("autoplay") else "human", "perks": perks, "unlocked": run.unlocked_popups, "tune": Tuning.spec})
 
 
 func _log(ev: String, fields: Dictionary = {}) -> void:
@@ -143,7 +144,9 @@ func _process(delta: float) -> void:
 	if _ended:
 		return
 	run.tick(delta)
-	if run.wave_finished():
+	if run.workday_over():
+		_workday_end()
+	elif run.wave_finished():
 		_start_break()
 	# Dev run limits so bot batches finish: end after N waves or N seconds.
 	if Game.dev.has("max_wave") and run.wave > int(Game.dev["max_wave"]):
@@ -161,6 +164,10 @@ func _wire_popup(popup: PopupBase) -> void:
 	popup.closed.connect(_on_popup_closed)
 	popup.timed_out.connect(_on_popup_timed_out)
 	popup.trap_hit.connect(_on_trap_hit)
+	popup.leaked.connect(_on_popup_leaked)
+	popup.hopped.connect(func(p: PopupBase) -> void:
+		_log("hop", {"type": p.type_id})
+		_float("nope!", p.global_position + Vector2(p.size.x * 0.5, 10), Color("ff6060"), 12))
 	_log("popup_spawned", {"type": popup.type_id, "ram_cost": popup.ram_cost, "clustered": popup.spawned_near, "ram_used": run.ram_used})
 
 
@@ -175,7 +182,22 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 	var at := popup.global_position + Vector2(popup.size.x * 0.5, 10)
 	var col := Color("7CFC00") if completed else Color.WHITE
 	_float("+%d" % reward, at, col, 16 if completed else 13)
+	if not completed and popup.dismiss_spawns() > 0:
+		# Consent fatigue: X-ing a cookie banner brings two more.
+		var spawn_type := str(popup.def["on_dismiss"].get("type", popup.type_id))
+		for i in range(popup.dismiss_spawns()):
+			spawner.spawn(spawn_type, popup.global_position + popup.size * 0.5)
+		_log("dismiss_penalty", {"type": popup.type_id, "count": popup.dismiss_spawns()})
+		_float("consent fatigue", at + Vector2(0, 20), Color("ff6060"), 12)
 	popup.queue_free()
+
+
+func _on_popup_leaked(popup: PopupBase, grow: int) -> void:
+	var extra := maxi(1, int(round(grow * run.leak_growth_mult)))
+	popup.ram_cost += extra
+	run.add_ram_cost(extra)
+	_log("leak_grow", {"type": popup.type_id, "grow": extra, "ram_cost": popup.ram_cost})
+	_float("+%d RAM" % extra, popup.global_position + Vector2(popup.size.x * 0.5, 10), Color("ff6060"), 12)
 
 
 func _on_popup_timed_out(popup: PopupBase) -> void:
@@ -185,7 +207,7 @@ func _on_popup_timed_out(popup: PopupBase) -> void:
 	match str(ot.get("kind", "none")):
 		"multiply":
 			if run.timeouts_multiply:
-				for i in range(int(ot.get("count", 1))):
+				for i in range(int(ot.get("count", 1)) * run.timeout_multiplier):
 					spawner.spawn(popup.type_id, near)
 				_float("multiplied!", near, Color("ff6060"), 12)
 		"spawn":
@@ -227,11 +249,60 @@ func _on_trap_hit(popup: PopupBase, kind: String) -> void:
 		"bundled":
 			spawner.spawn("ad", near)
 			_float("Weather Buddy installed", near, Color("ff6060"), 12)
+		"accept_all":
+			for i in range(2):
+				spawner.spawn("ad", near)
+			_float("847 partners notified", near, Color("ff6060"), 12)
 		_:
 			pass
 
 
 # ---------- waves ----------
+
+## 5 PM: the workday is survived. Clock out (win) or keep going (overtime).
+func _workday_end() -> void:
+	if _clockout != null:
+		return
+	run.log_wave_end(imp_manager.imps.size(), imp_manager.count_trained())
+	_log("wave_end", run.wave_log[run.wave_log.size() - 1])
+	run.begin_break()
+	run.clock_out()
+	_log("clock_out", {"score": run.score, "tier": run.tier})
+	village.cancel_place()
+	start_menu.visible = false
+	_banner("5:00 PM", Color("ffd700"))
+	_clockout = ConfirmDialog.new("It's 5:00 PM", "You survived the workday. Clock out now, or stay for Overtime?\n\nOvertime keeps going until the machine crashes. Your score only goes up.")
+	_clockout.set_window_size(Vector2(360, 150))
+	var yes := _find_button(_clockout, "Yes")
+	var no := _find_button(_clockout, "No")
+	if yes != null:
+		yes.label = "Clock out"
+		yes.custom_minimum_size = Vector2(95, 23)
+	if no != null:
+		no.label = "Overtime"
+		no.custom_minimum_size = Vector2(95, 23)
+	_clockout.answered.connect(func(clock_out: bool) -> void:
+		_clockout.queue_free()
+		_clockout = null
+		if clock_out:
+			_end("CLOCKED_OUT")
+		else:
+			_log("overtime", {})
+			run.start_overtime()
+			_banner("OVERTIME", Color("ff6060")))
+	add_child(_clockout)
+	_clockout.center_in_parent()
+
+
+func _find_button(root: Node, label: String) -> Win98Button:
+	if root is Win98Button and root.label == label:
+		return root
+	for c: Node in root.get_children():
+		var f := _find_button(c, label)
+		if f != null:
+			return f
+	return null
+
 
 func _start_break() -> void:
 	run.log_wave_end(imp_manager.imps.size(), imp_manager.count_trained())
@@ -271,21 +342,28 @@ func _toggle_start_menu() -> void:
 		start_menu.visible = false
 		return
 	start_menu.refresh(run, village)
+	start_menu.position = Vector2(2, DESKTOP_H - start_menu.size.y)
 	start_menu.visible = true
 	start_menu.move_to_front()
 
 
 func _begin_place(id: String) -> void:
 	start_menu.visible = false
+	if not (id in BuildingCatalog.available(run.unlocked_buildings)):
+		return
 	if village.count(id) >= BuildingCatalog.max_count(id):
 		_float("maxed out", Vector2(640, 300), Color("ff6060"), 14)
 		return
-	village.begin_place(id, run.bytes >= BuildingCatalog.cost(id, village.count(id)))
+	village.begin_place(id, run.bytes >= building_cost(id, village.count(id)))
+
+
+func building_cost(id: String, owned: int) -> int:
+	return BuildingCatalog.cost(id, owned, run.building_cost_mult)
 
 
 func _on_place_requested(id: String, cell: Vector2i) -> void:
 	var owned := village.count(id)
-	var cost := BuildingCatalog.cost(id, owned)
+	var cost := building_cost(id, owned)
 	if owned >= BuildingCatalog.max_count(id):
 		village.cancel_place()
 		return
@@ -295,7 +373,7 @@ func _on_place_requested(id: String, cell: Vector2i) -> void:
 	_build(id, cell, cost)
 	# stay in placement mode while another copy is possible and affordable
 	var next_owned := village.count(id)
-	if next_owned >= BuildingCatalog.max_count(id) or run.bytes < BuildingCatalog.cost(id, next_owned):
+	if next_owned >= BuildingCatalog.max_count(id) or run.bytes < building_cost(id, next_owned):
 		village.cancel_place()
 	else:
 		village.set_affordable(true)
@@ -322,6 +400,10 @@ func _build(id: String, cell: Vector2i, cost: int) -> void:
 			run.timeouts_multiply = false
 		"shrine":
 			run.click_bonus += 1
+		"helpdesk":
+			run.helpdesk = true
+		"screensaver":
+			spawner.screensaver = true
 	if cost > 0:
 		_float("-%d" % cost, at, Color("ffd700"), 13)
 
@@ -400,8 +482,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var idx := int(key.keycode - KEY_1)
-		if idx < BuildingCatalog.ORDER.size() and not run.in_break:
-			_begin_place(BuildingCatalog.ORDER[idx])
+		var avail := BuildingCatalog.available(run.unlocked_buildings)
+		if idx < avail.size() and not run.in_break:
+			_begin_place(avail[idx])
 			get_viewport().set_input_as_handled()
 
 

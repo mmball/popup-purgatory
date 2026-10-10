@@ -33,7 +33,7 @@ func test_type_unlock_by_wave() -> void:
 	var seen := {}
 	for i in range(2000):
 		seen[s.pick_type(10)] = true
-	assert_eq(seen.size(), PopupCatalog.DEFS.size(), "every type appears by wave 10")
+	assert_eq(seen.size(), PopupCatalog.base_ids().size(), "every base type appears by wave 10")
 
 
 func test_deterministic_with_seed() -> void:

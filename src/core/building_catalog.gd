@@ -54,10 +54,36 @@ const DEFS := {
 		"max": 3,
 		"color": Color("4169e1"),
 	},
+	"helpdesk": {
+		"name": "Help Desk",
+		"desc": "Imps learn to close Live Chat widgets, which otherwise dodge them.",
+		"cost": 45,
+		"max": 1,
+		"color": Color("20b2aa"),
+		"unlock": "hundred_closed",
+	},
+	"screensaver": {
+		"name": "Screensaver",
+		"desc": "Every 30 seconds, no pop-ups spawn for 6 seconds.",
+		"cost": 55,
+		"max": 1,
+		"color": Color("9932cc"),
+		"unlock": "clock_out",
+	},
 }
 
 ## Order shown in the build menu and bound to number keys 1..n.
-const ORDER: Array[String] = ["hut", "dojo", "coffee", "ram", "firewall", "antivirus", "shrine"]
+const ORDER: Array[String] = ["hut", "dojo", "coffee", "ram", "firewall", "antivirus", "shrine", "helpdesk", "screensaver"]
+
+
+## Buildings a run may build: base ones plus unlocked ones, in ORDER.
+static func available(unlocked: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for id: String in ORDER:
+		if DEFS[id].has("unlock") and not (str(DEFS[id]["unlock"]) in unlocked):
+			continue
+		out.append(id)
+	return out
 
 
 static func get_def(id: String) -> Dictionary:
@@ -67,10 +93,10 @@ static func get_def(id: String) -> Dictionary:
 	return d
 
 
-static func cost(id: String, owned: int) -> int:
+static func cost(id: String, owned: int, mult: float = 1.0) -> int:
 	var base := Tuning.num("building.%s.cost" % id, float(DEFS[id]["cost"]))
 	var growth := Tuning.num("building.cost_growth", COST_GROWTH)
-	return int(round(base * (1.0 + growth * owned)))
+	return int(round(base * (1.0 + growth * owned) * mult))
 
 
 static func max_count(id: String) -> int:

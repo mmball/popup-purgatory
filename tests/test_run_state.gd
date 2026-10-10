@@ -78,6 +78,7 @@ func test_wave_clock_and_break() -> void:
 	var run := RunState.new()
 	run.start_wave(1)
 	assert_near(run.wave_time_left, RunState.wave_duration(1), 0.001, "duration")
+	assert_near(RunState.wave_duration(1), 50.0, 0.001, "first hour is 50 s")
 	run.tick(RunState.wave_duration(1) + 1.0)
 	assert_true(run.wave_finished(), "finished")
 	run.begin_break()

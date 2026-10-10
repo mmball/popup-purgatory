@@ -39,6 +39,8 @@ How the game works:
 - Pop-ups keep appearing. Each open pop-up occupies RAM (ram_used). If ram_used exceeds ram_max for 3 seconds the machine crashes and the run ends. Survival is the first priority.
 - Closing a pop-up pays bytes. "dismiss" (clicking the X) pays little; "complete" (doing what the pop-up asks) pays several times more but only some pop-ups can be completed in one click (cheap_complete=true).
 - Some pop-ups punish neglect: timeout_kind "multiply" clones the pop-up when age_since_timeout reaches lifetime; "spawn" spawns errors; "escalate" raises its RAM cost. Close those before they time out.
+- Targeted challenges: a pop-up with dismiss_spawns>0 (cookie banner) spawns that many more if you dismiss it, so complete it instead. imp_proof pop-ups (Live Chat) dodge imps unless you own a Help Desk. leak pop-ups grow their RAM cost every few seconds until completed; dismissing pays nothing.
+- The run is one workday of 8 waves; survive wave 8 and you clock out (a win). After that, overtime is endless.
 - Bytes buy buildings. Imp Huts hire imps who walk to pop-ups and dismiss them for you; an Imp Dojo trains two imps to complete instead; RAM Sticks raise ram_max; Coffee Carts speed imps; Firewalls slow spawning; the Antivirus Shrine stops timeouts from multiplying; the Pointer Shrine pays +1 per pop-up you close yourself. Building prices rise with each copy.
 - Between waves you pick one of three upgrades.
 - Spending bytes never lowers your score (score = total bytes earned), so build whenever it helps.
@@ -76,11 +78,15 @@ def heuristic(state):
         mid = f"complete:{p['id']}" if p["cheap_complete"] else f"dismiss:{p['id']}"
         if mid in moves:
             return mid, "about to time out"
-    # 2. RAM pressure: dismiss the costliest
+    # 1b. leaks grow: complete them while they are cheap
+    for p in sorted(popups, key=lambda p: -p["ram_cost"]):
+        if p.get("leak") and f"complete:{p['id']}" in moves:
+            return f"complete:{p['id']}", "leak growing"
+    # 2. RAM pressure: dismiss the costliest (never a cookie banner: X-ing it spawns more)
     if pressure > 0.7 and popups:
         for p in sorted(popups, key=lambda p: -p["ram_cost"]):
             mid = f"dismiss:{p['id']}"
-            if mid in moves:
+            if mid in moves and not p.get("dismiss_spawns"):
                 return mid, f"ram pressure {pressure:.2f}"
     # 3. cheap completions, oldest first
     for p in sorted(popups, key=lambda p: -p["age"]):
@@ -94,11 +100,11 @@ def heuristic(state):
             return "build:dojo", "dojo before more huts"
         if f"build:{want}" in moves and (want != "hut" or b.get("hut", 0) < 3 or b.get("dojo", 0) > 0):
             return f"build:{want}", f"build {want}"
-    # 5. dismiss the oldest if the desk is crowded
+    # 5. dismiss the oldest if the desk is crowded (cookies excepted)
     if len(popups) >= 3:
         for p in sorted(popups, key=lambda p: -p["age"]):
             mid = f"dismiss:{p['id']}"
-            if mid in moves:
+            if mid in moves and not p.get("dismiss_spawns"):
                 return mid, "crowded"
     return "wait", "nothing urgent"
 
@@ -156,7 +162,7 @@ class ClaudeBackend:
 
 # ---------- protocol loop ----------
 
-def serve(godot, backend, runs, seed, max_wave, decision_interval, log_path):
+def serve(godot, backend, runs, seed, max_wave, decision_interval, log_path, unlock_all=False):
     os.makedirs(POLICY_DIR, exist_ok=True)
     for f in glob.glob(os.path.join(POLICY_DIR, "*.json")):
         os.remove(f)
@@ -164,7 +170,7 @@ def serve(godot, backend, runs, seed, max_wave, decision_interval, log_path):
     args = [godot, "--headless", "--fixed-fps", "60", "--path", ".", "--quit-after", str(runs * max_wave * 60 * 120),
             "--", "--screen=desktop", "--autoplay=1", "--policy=external", f"--policy-dir={POLICY_DIR}",
             f"--decision-interval={decision_interval}", f"--runs={runs}", f"--seed={seed}",
-            f"--max-wave={max_wave}", f"--jsonl={out}"]
+            f"--max-wave={max_wave}", f"--jsonl={out}", "--fresh-meta"] + (["--unlock-all=1"] if unlock_all else [])
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     log = open(log_path, "a")
     seq = 0
@@ -208,10 +214,11 @@ def main():
     ap.add_argument("--seed", type=int, default=300)
     ap.add_argument("--max-wave", type=int, default=3)
     ap.add_argument("--decision-interval", type=float, default=1.0, help="game seconds between decisions")
+    ap.add_argument("--unlock-all", action="store_true", help="play with every content unlock in the pool")
     a = ap.parse_args()
     backend = heuristic if a.backend == "heuristic" else ClaudeBackend(a.model, a.effort)
     os.makedirs("runs", exist_ok=True)
-    out = serve(a.godot, backend, a.runs, a.seed, a.max_wave, a.decision_interval, os.path.join(POLICY_DIR, "decisions.jsonl"))
+    out = serve(a.godot, backend, a.runs, a.seed, a.max_wave, a.decision_interval, os.path.join(POLICY_DIR, "decisions.jsonl"), a.unlock_all)
     subprocess.run([sys.executable, "tools/summarize_runs.py", out])
 
 

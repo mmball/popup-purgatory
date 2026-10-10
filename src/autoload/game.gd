@@ -10,6 +10,10 @@ var last_run: RunState
 var dev: Dictionary = {}
 ## Seed typed on the main menu for the next run; -1 means draw a random one.
 var requested_seed := -1
+## Service Pack chosen on the main menu (clamped to what meta has unlocked).
+var requested_tier := 0
+## Achievements earned by the run that just ended (for the end screen).
+var last_earned: Array[String] = []
 
 
 func _ready() -> void:
@@ -32,16 +36,25 @@ func start_run() -> void:
 		var r := RandomNumberGenerator.new()
 		r.randomize()
 		run.seed = r.randi_range(0, 999_999_999)
-	print("seed=%d run started" % run.seed)
 	meta.apply_to_run(run)
+	if dev.has("unlock_all"):  # --unlock-all: every content unlock, for batches on the full pool
+		var all_ids: Array[String] = []
+		for a: String in MetaSave.ACHIEVEMENTS.keys():
+			all_ids.append(a)
+		run.unlocked_popups = all_ids.duplicate()
+		run.unlocked_buildings = all_ids.duplicate()
+		run.unlocked_upgrades = all_ids.duplicate()
+	var tier := int(dev["tier"]) if dev.has("tier") else requested_tier
+	Ladder.apply(clampi(tier, 0, meta.max_tier_unlocked if not dev.has("tier") else Ladder.max_tier()), run)
+	print("seed=%d tier=%d run started" % [run.seed, run.tier])
 	screen_requested.emit("desktop")
 
 
 func end_run(reason: String) -> void:
 	if run != null:
 		run.crash_reason = reason
-		print("seed=%d run ended: %s wave=%d score=%d" % [run.seed, reason, run.wave, run.score])
-		meta.record_run(run)
+		print("seed=%d run ended: %s wave=%d score=%d won=%s" % [run.seed, reason, run.wave, run.score, run.won])
+		last_earned = meta.record_run(run)
 		meta.save_to_disk()
 		last_run = run
 	run = null

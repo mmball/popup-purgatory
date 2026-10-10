@@ -51,9 +51,22 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	_rebuild(BuildingCatalog.ORDER)
+
+
+var _built_for: Array[String] = []
+
+
+func _rebuild(ids: Array[String]) -> void:
+	if ids == _built_for:
+		return
+	_built_for = ids.duplicate()
+	for c: Node in get_children():
+		c.queue_free()
+	_items.clear()
 	var y := 4
-	for i in range(BuildingCatalog.ORDER.size()):
-		var id: String = BuildingCatalog.ORDER[i]
+	for i in range(ids.size()):
+		var id: String = ids[i]
 		var def := BuildingCatalog.get_def(id)
 		var item := MenuItem.new()
 		item.caption = str(def["name"])
@@ -76,20 +89,23 @@ func _ready() -> void:
 	y += ITEM_H + 4
 	size = Vector2(WIDTH, y)
 	custom_minimum_size = size
+	queue_redraw()
 
 
 func refresh(run: RunState, village: Village) -> void:
 	_run = run
 	_village = village
-	for i in range(BuildingCatalog.ORDER.size()):
-		var id: String = BuildingCatalog.ORDER[i]
+	var ids := BuildingCatalog.available(run.unlocked_buildings)
+	_rebuild(ids)
+	for i in range(ids.size()):
+		var id: String = ids[i]
 		var owned := village.count(id)
 		var maxed := owned >= BuildingCatalog.max_count(id)
 		var item: MenuItem = _items[i]
 		if maxed:
 			item.detail = "MAX (%d)" % owned
 		else:
-			item.detail = "%d B   x%d" % [BuildingCatalog.cost(id, owned), owned]
+			item.detail = "%d B   x%d" % [BuildingCatalog.cost(id, owned, run.building_cost_mult), owned]
 		item.disabled = maxed
 		item.queue_redraw()
 
@@ -102,6 +118,6 @@ func _draw() -> void:
 	Win98.draw_text(self, Vector2.ZERO, "Popup Purgatory 98", Win98.GRAY, 14)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# separator above Shut Down
-	var sep_y := 4 + BuildingCatalog.ORDER.size() * ITEM_H + 3
+	var sep_y := 4 + _items.size() * ITEM_H + 3
 	draw_rect(Rect2(BAND_W + 4, sep_y, size.x - BAND_W - 8, 1), Win98.GRAY_DARK)
 	draw_rect(Rect2(BAND_W + 4, sep_y + 1, size.x - BAND_W - 8, 1), Win98.WHITE)

@@ -86,6 +86,13 @@ func _seek(delta: float) -> void:
 		return
 	var dest := target.imp_close_point()
 	if _move_toward(dest, speed(), delta) <= ARRIVE_DIST:
+		if target.is_imp_proof() and not (run != null and run.helpdesk):
+			# Live Chat dodges imps unless a Help Desk taught them the trick.
+			var parent := target.get_parent()
+			var bounds := Rect2(Vector2.ZERO, parent.size) if parent is Control else Rect2(0, 0, 1280, 690)
+			target.hop(bounds)
+			_drop_target()
+			return
 		state = State.WORK
 		var will_complete := trained
 		_work_total = (target.imp_complete_time() if will_complete else Tuning.num("imp.dismiss_time", DISMISS_TIME))

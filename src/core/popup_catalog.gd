@@ -115,6 +115,54 @@ const DEFS := {
 		"x_lock": 0.0,
 		"content": "res://src/popups/content/toolbar_content.gd",
 	},
+	"cookie": {
+		"title": "We value your privacy",
+		"size": Vector2(380, 230),
+		"ram_cost": 9,
+		"dismiss_reward": 1,
+		"complete_reward": 7,
+		"imp_complete_time": 3.0,
+		"min_wave": 2,
+		"weight": 6,
+		"lifetime": 0.0,
+		"on_timeout": {"kind": "none"},
+		"x_lock": 0.0,
+		"on_dismiss": {"kind": "spawn", "type": "cookie", "count": 2},
+		"unlock": "clock_out",
+		"content": "res://src/popups/content/cookie_content.gd",
+	},
+	"chat": {
+		"title": "Live Chat",
+		"size": Vector2(260, 200),
+		"ram_cost": 7,
+		"dismiss_reward": 1,
+		"complete_reward": 6,
+		"imp_complete_time": 2.5,
+		"min_wave": 3,
+		"weight": 5,
+		"lifetime": 0.0,
+		"on_timeout": {"kind": "none"},
+		"x_lock": 0.0,
+		"imp_proof": true,
+		"unlock": "hundred_closed",
+		"content": "res://src/popups/content/chat_content.gd",
+	},
+	"leak": {
+		"title": "Memory Leak Detected",
+		"size": Vector2(320, 170),
+		"ram_cost": 6,
+		"dismiss_reward": 0,
+		"complete_reward": 9,
+		"imp_complete_time": 4.0,
+		"min_wave": 4,
+		"weight": 5,
+		"lifetime": 0.0,
+		"on_timeout": {"kind": "none"},
+		"x_lock": 0.0,
+		"leak": {"every": 5.0, "grow": 3},
+		"unlock": "dojo_built",
+		"content": "res://src/popups/content/leak_content.gd",
+	},
 	"virus": {
 		"title": "!!! WARNING !!!",
 		"size": Vector2(340, 200),
@@ -159,9 +207,22 @@ static func ids() -> Array[String]:
 	return out
 
 
-static func available_on_wave(wave: int) -> Array[String]:
+## Types that can spawn on `wave`. Types with an `unlock` field need that
+## achievement id in `unlocked` (pass the run's unlocked_popups).
+static func available_on_wave(wave: int, unlocked: Array[String] = []) -> Array[String]:
 	var out: Array[String] = []
 	for k: String in DEFS.keys():
-		if int(DEFS[k]["min_wave"]) <= wave:
+		if int(DEFS[k]["min_wave"]) > wave:
+			continue
+		if DEFS[k].has("unlock") and not (str(DEFS[k]["unlock"]) in unlocked):
+			continue
+		out.append(k)
+	return out
+
+
+static func base_ids() -> Array[String]:
+	var out: Array[String] = []
+	for k: String in DEFS.keys():
+		if not DEFS[k].has("unlock"):
 			out.append(k)
 	return out

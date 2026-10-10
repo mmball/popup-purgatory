@@ -19,6 +19,8 @@ var _boot_t := 0.0
 var _welcome: WindowFrame
 var _shop: WindowFrame
 var _stats: Label
+var _tier_label: Label
+var _tier_desc: Label
 
 
 func _ready() -> void:
@@ -61,9 +63,9 @@ func _build_desktop() -> void:
 	_welcome = WindowFrame.new()
 	_welcome.window_title = "Welcome to Popup Purgatory 98"
 	_welcome.closable = false
-	_welcome.set_window_size(Vector2(420, 360))
+	_welcome.set_window_size(Vector2(440, 420))
 	add_child(_welcome)
-	_welcome.position = Vector2(430, 170)
+	_welcome.position = Vector2(420, 140)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
@@ -77,7 +79,7 @@ func _build_desktop() -> void:
 	box.add_child(title)
 
 	var blurb := Label.new()
-	blurb.text = "Close the pop-ups. Completing one pays more than X-ing it. Spend bytes on imps who close them for you. Run out of RAM and the machine crashes."
+	blurb.text = "One workday: 9 AM to 5 PM, one wave an hour. Close the pop-ups; completing one pays more than X-ing it. Spend bytes on imps who close them for you. Run out of RAM and the machine crashes. Make it to 5 PM and you clock out."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.add_theme_font_size_override("font_size", 12)
 	box.add_child(blurb)
@@ -90,6 +92,28 @@ func _build_desktop() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
+
+	var tier_row := HBoxContainer.new()
+	tier_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	tier_row.add_theme_constant_override("separation", 6)
+	box.add_child(tier_row)
+	var less := Win98Button.new("<", Vector2(24, 22))
+	less.pressed.connect(func() -> void: _set_tier(Game.requested_tier - 1))
+	tier_row.add_child(less)
+	_tier_label = Label.new()
+	_tier_label.custom_minimum_size = Vector2(120, 0)
+	_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tier_label.add_theme_font_size_override("font_size", 12)
+	tier_row.add_child(_tier_label)
+	var more := Win98Button.new(">", Vector2(24, 22))
+	more.pressed.connect(func() -> void: _set_tier(Game.requested_tier + 1))
+	tier_row.add_child(more)
+	_tier_desc = Label.new()
+	_tier_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tier_desc.add_theme_font_size_override("font_size", 10)
+	_tier_desc.add_theme_color_override("font_color", Win98.GRAY_DARK)
+	box.add_child(_tier_desc)
+	_set_tier(Game.requested_tier)
 
 	var seed_row := HBoxContainer.new()
 	seed_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -135,7 +159,16 @@ func _build_desktop() -> void:
 
 func _refresh_stats() -> void:
 	var meta: MetaSave = Game.meta
-	_stats.text = "High score: %d bytes    Best wave: %d    Runs: %d\nBank: %d bytes to spend on unlocks" % [meta.high_score, meta.best_wave, meta.runs, meta.bank]
+	_stats.text = "High score: %d    Best hour: %d    Runs: %d    Clock-outs: %d\nBank: %d bytes    Unlocked content: %d / %d" % [meta.high_score, meta.best_wave, meta.runs, meta.wins, meta.bank, meta.achievements.size(), MetaSave.ACHIEVEMENTS.size()]
+
+
+func _set_tier(t: int) -> void:
+	var meta: MetaSave = Game.meta
+	Game.requested_tier = clampi(t, 0, meta.max_tier_unlocked)
+	var def := Ladder.get_def(Game.requested_tier)
+	_tier_label.text = str(def["name"])
+	var locked_hint := "" if meta.max_tier_unlocked > Game.requested_tier or Game.requested_tier == Ladder.max_tier() else "  (clock out here to unlock SP%d)" % (Game.requested_tier + 1)
+	_tier_desc.text = str(def["desc"]) + locked_hint
 
 
 func _toggle_shop() -> void:
@@ -144,8 +177,8 @@ func _toggle_shop() -> void:
 		_shop = null
 		return
 	_shop = WindowFrame.new()
-	_shop.window_title = "Unlocks - spend lifetime bytes"
-	_shop.set_window_size(Vector2(420, 260))
+	_shop.window_title = "Unlocks"
+	_shop.set_window_size(Vector2(480, 420))
 	_shop.close_requested.connect(_toggle_shop)
 	add_child(_shop)
 	_shop.position = Vector2(440, 100)
@@ -160,6 +193,25 @@ func _fill_shop() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	_shop.content.add_child(box)
+	var h1 := Label.new()
+	h1.text = "Content unlocks (earned by playing; they widen the pools, never your stats)"
+	h1.add_theme_font_size_override("font_size", 11)
+	h1.add_theme_color_override("font_color", Win98.TITLE_A)
+	box.add_child(h1)
+	for aid: String in MetaSave.ACHIEVEMENTS.keys():
+		var ach: Dictionary = MetaSave.ACHIEVEMENTS[aid]
+		var l := Label.new()
+		var done := meta.has_achievement(aid)
+		l.text = "%s %s: %s  [%s]\n    adds: %s" % ["[x]" if done else "[ ]", ach["name"], ach["desc"], "done" if done else meta.achievement_progress(aid), ach["adds"]]
+		l.add_theme_font_size_override("font_size", 11)
+		if not done:
+			l.add_theme_color_override("font_color", Win98.GRAY_DARK)
+		box.add_child(l)
+	var h2 := Label.new()
+	h2.text = "Starting perks (bought with banked bytes; small and one-time)"
+	h2.add_theme_font_size_override("font_size", 11)
+	h2.add_theme_color_override("font_color", Win98.TITLE_A)
+	box.add_child(h2)
 	for id: String in MetaSave.PERKS.keys():
 		var perk: Dictionary = MetaSave.PERKS[id]
 		var row := HBoxContainer.new()

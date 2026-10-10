@@ -32,7 +32,7 @@ def run_variant(godot, idx, tune, runs, seed, max_wave, policy):
     out = f"runs/sweep_{idx}.jsonl"
     args = [godot, "--headless", "--fixed-fps", "60", "--path", ".", "--quit-after", str(runs * max_wave * 60 * 120),
             "--", "--screen=desktop", "--autoplay=1", f"--policy={policy}", f"--runs={runs}", f"--seed={seed}",
-            f"--max-wave={max_wave}", f"--jsonl={out}", "--no-telemetry"]
+            f"--max-wave={max_wave}", f"--jsonl={out}", "--no-telemetry", "--fresh-meta"]
     if tune != "base":
         args.append(f"--tune={tune}")
     proc = subprocess.run(args, capture_output=True, text=True)

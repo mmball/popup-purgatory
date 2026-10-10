@@ -67,6 +67,10 @@ func live_popups() -> Array[PopupBase]:
 func request_target(imp: Imp) -> PopupBase:
 	var candidates: Array = []
 	for p: PopupBase in live_popups():
+		if p.imp_cooldown > 0.0:
+			continue  # it just hopped away from an imp; leave it alone for a while
+		if p.dismiss_spawns() > 0 and not imp.trained:
+			continue  # untrained imps would X it and spawn more (cookie banners)
 		candidates.append({"id": p.get_instance_id(), "pos": p.imp_close_point(), "age": p.age})
 	var id: Variant = assigner.claim(candidates, imp.get_instance_id(), imp.position)
 	if id == null:

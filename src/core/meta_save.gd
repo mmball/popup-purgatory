@@ -12,20 +12,78 @@ const PERKS := {
 	"veteran_imps": {"name": "Veteran Imps", "desc": "Imps start every run 20% faster.", "cost": 80},
 }
 
+## Sideways unlocks: each achievement adds content to the pools, never stats.
+const ACHIEVEMENTS := {
+	"clock_out": {"name": "Clocked Out", "desc": "Survive until 5 PM once.", "adds": "Cookie banners, the Screensaver, Consent Manager"},
+	"hundred_closed": {"name": "Inbox Zero", "desc": "Close 100 pop-ups across all runs.", "adds": "Live Chat widgets, the Help Desk, Do Not Disturb"},
+	"dojo_built": {"name": "Sensei", "desc": "Build an Imp Dojo in any run.", "adds": "Memory leaks, Garbage Collector"},
+	"sp2_win": {"name": "Patched", "desc": "Clock out on Service Pack 2 or higher.", "adds": "Bragging rights (and SP3 to SP6)"},
+}
+
 var high_score := 0
 var best_wave := 0
 var runs := 0
+var wins := 0
 var lifetime_bytes := 0
 var bank := 0
-var unlocks: Array[String] = []
+var lifetime_closed := 0
+var lifetime_completed := 0
+var dojos_built := 0
+var max_tier_unlocked := 0
+var best_tier_won := -1
+var unlocks: Array[String] = []        ## perks bought with bank
+var achievements: Array[String] = []   ## sideways unlocks earned
 
 
-func record_run(run: RunState) -> void:
+## Records a finished run and returns the achievement ids newly earned.
+func record_run(run: RunState) -> Array[String]:
 	runs += 1
 	high_score = maxi(high_score, run.score)
 	best_wave = maxi(best_wave, run.wave)
 	lifetime_bytes += run.score
 	bank += run.score
+	lifetime_closed += run.popups_closed
+	lifetime_completed += run.popups_completed
+	dojos_built += run.buildings_list.count("dojo")
+	if run.won:
+		wins += 1
+		best_tier_won = maxi(best_tier_won, run.tier)
+		max_tier_unlocked = clampi(maxi(max_tier_unlocked, run.tier + 1), 0, Ladder.max_tier())
+	var earned: Array[String] = []
+	if run.won:
+		earned.append_array(_earn("clock_out"))
+	if lifetime_closed >= 100:
+		earned.append_array(_earn("hundred_closed"))
+	if dojos_built > 0:
+		earned.append_array(_earn("dojo_built"))
+	if run.won and run.tier >= 2:
+		earned.append_array(_earn("sp2_win"))
+	return earned
+
+
+func _earn(id: String) -> Array[String]:
+	if id in achievements:
+		return []
+	achievements.append(id)
+	return [id]
+
+
+func has_achievement(id: String) -> bool:
+	return id in achievements
+
+
+## Progress text for the unlocks window.
+func achievement_progress(id: String) -> String:
+	match id:
+		"clock_out":
+			return "%d win(s)" % wins
+		"hundred_closed":
+			return "%d / 100 closed" % mini(lifetime_closed, 100)
+		"dojo_built":
+			return "%d dojo(s) built" % dojos_built
+		"sp2_win":
+			return "best win: SP%d" % best_tier_won if best_tier_won >= 0 else "no wins yet"
+	return ""
 
 
 func has(perk: String) -> bool:
@@ -44,8 +102,11 @@ func buy(perk: String) -> bool:
 	return true
 
 
-## Writes the perks into a fresh run.
+## Writes the perks and the unlocked content pools into a fresh run.
 func apply_to_run(run: RunState) -> void:
+	run.unlocked_popups = achievements.duplicate()
+	run.unlocked_buildings = achievements.duplicate()
+	run.unlocked_upgrades = achievements.duplicate()
 	if has("starter_hut"):
 		run.starting_buildings.append("hut")
 	if has("extra_ram"):
@@ -65,6 +126,13 @@ func to_dict() -> Dictionary:
 		"lifetime_bytes": lifetime_bytes,
 		"bank": bank,
 		"unlocks": unlocks,
+		"wins": wins,
+		"lifetime_closed": lifetime_closed,
+		"lifetime_completed": lifetime_completed,
+		"dojos_built": dojos_built,
+		"max_tier_unlocked": max_tier_unlocked,
+		"best_tier_won": best_tier_won,
+		"achievements": achievements,
 	}
 
 
@@ -74,10 +142,20 @@ func from_dict(d: Dictionary) -> void:
 	runs = int(d.get("runs", 0))
 	lifetime_bytes = int(d.get("lifetime_bytes", 0))
 	bank = int(d.get("bank", 0))
+	wins = int(d.get("wins", 0))
+	lifetime_closed = int(d.get("lifetime_closed", 0))
+	lifetime_completed = int(d.get("lifetime_completed", 0))
+	dojos_built = int(d.get("dojos_built", 0))
+	max_tier_unlocked = clampi(int(d.get("max_tier_unlocked", 0)), 0, Ladder.max_tier())
+	best_tier_won = int(d.get("best_tier_won", -1))
 	unlocks.clear()
 	for u: Variant in d.get("unlocks", []):
 		if PERKS.has(str(u)):
 			unlocks.append(str(u))
+	achievements.clear()
+	for a: Variant in d.get("achievements", []):
+		if ACHIEVEMENTS.has(str(a)):
+			achievements.append(str(a))
 
 
 func save_to_disk(path: String = PATH) -> bool:
