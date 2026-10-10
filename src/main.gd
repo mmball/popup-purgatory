@@ -17,6 +17,8 @@ func _ready() -> void:
 			show_screen("bsod")
 		_:
 			show_screen("menu")
+	if dev.has("autoplay"):
+		add_child(Autoplay.new())
 	if dev.has("screenshot"):
 		_schedule_screenshots(str(dev["screenshot"]), float(dev.get("delay", "2.0")), int(dev.get("shots", "1")))
 

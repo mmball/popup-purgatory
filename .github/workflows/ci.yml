@@ -4,28 +4,70 @@ on:
   push:
   pull_request:
 
+env:
+  GODOT_VERSION: 4.7-stable
+
 jobs:
   test:
+    name: Lint, unit tests, bot runs, determinism
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Godot 4.7 (headless-capable Linux build)
+      - name: Install Godot ${{ env.GODOT_VERSION }}
         run: |
-          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
           unzip -q godot.zip
-          mv Godot_v4.7-stable_linux.x86_64 godot
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
           chmod +x godot
 
-      - name: Import, unit tests, smoke run
+      - name: Lint, import, unit tests, bot smoke run, determinism
         run: tools/test.sh ./godot
 
-      - name: Upload logs
+      - name: JUnit report
+        if: always()
+        run: ./godot --headless --path . -s tests/run_tests.gd -- --junit=junit.xml >/dev/null 2>&1 || true
+
+      - name: Bot batch (greedy + random, 3 seeds each, 2 waves)
+        run: |
+          tools/botrun.sh ./godot 3 greedy 100 2
+          tools/botrun.sh ./godot 3 random 200 2
+          python3 tools/summarize_runs.py runs/*.jsonl | tee runs/summary.txt
+
+      - name: Upload logs and run data
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs
+          name: logs-and-runs
           path: |
             import.log
             tests.log
             smoke.log
+            det_*.log
+            junit.xml
+            runs/
+
+  screenshots:
+    name: Screenshot regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} and a virtual display
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libegl1 libxcursor1 libxinerama1 libxrandr2 libxi6 >/dev/null
+
+      - name: Render fixed UI states and compare against tests/screenshots
+        run: tools/screenshot_check.sh ./godot
+
+      - name: Upload rendered screens and diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/*.png

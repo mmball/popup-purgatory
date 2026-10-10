@@ -57,6 +57,30 @@ var player_closes := 0
 var imp_closes := 0
 var imps_hired := 0
 var buildings_built := 0
+var buildings_list: Array[String] = []   ## building ids in build order
+var upgrades_picked: Array[String] = []  ## upgrade ids in pick order
+var wave_log: Array[Dictionary] = []     ## one snapshot per completed wave
+
+
+## Snapshot the run at the end of a wave (called when the break begins).
+func log_wave_end(imps: int, trained: int) -> void:
+	wave_log.append({
+		"wave": wave, "score": score, "bytes": bytes, "ram_max": ram_max, "ram_used": ram_used,
+		"spawned": popups_spawned, "closed": popups_closed, "completed": popups_completed,
+		"player_closes": player_closes, "imp_closes": imp_closes, "imps": imps, "trained": trained,
+		"buildings": buildings_built, "elapsed": snappedf(elapsed, 0.01),
+	})
+
+
+## Flat summary of the run for logs and JSONL.
+func summary() -> Dictionary:
+	return {
+		"seed": seed, "reason": crash_reason, "wave": wave, "score": score, "bytes": bytes,
+		"elapsed": snappedf(elapsed, 0.01), "spawned": popups_spawned, "closed": popups_closed,
+		"completed": popups_completed, "player_closes": player_closes, "imp_closes": imp_closes,
+		"imps_hired": imps_hired, "buildings_built": buildings_built, "buildings": buildings_list,
+		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log,
+	}
 
 
 static func wave_duration(w: int) -> float:

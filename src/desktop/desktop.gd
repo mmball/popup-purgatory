@@ -91,10 +91,6 @@ func _ready() -> void:
 	_place_starting_buildings()
 	if Game.dev.has("demo"):
 		_demo_setup()
-	if Game.dev.has("autoplay"):
-		var bot := Autoplay.new()
-		bot.desktop = self
-		add_child(bot)
 	match str(Game.dev.get("ui", "")):
 		"start":
 			_toggle_start_menu()
@@ -127,6 +123,13 @@ func _process(delta: float) -> void:
 	run.tick(delta)
 	if run.wave_finished():
 		_start_break()
+	# Dev run limits so bot batches finish: end after N waves or N seconds.
+	if Game.dev.has("max_wave") and run.wave > int(Game.dev["max_wave"]):
+		_end("MAX_WAVE")
+		return
+	if Game.dev.has("max_seconds") and run.elapsed >= float(Game.dev["max_seconds"]):
+		_end("MAX_SECONDS")
+		return
 	taskbar.update_from(run, imp_manager.imps.size(), imp_manager.count_trained())
 
 
@@ -205,6 +208,7 @@ func _on_trap_hit(popup: PopupBase, kind: String) -> void:
 # ---------- waves ----------
 
 func _start_break() -> void:
+	run.log_wave_end(imp_manager.imps.size(), imp_manager.count_trained())
 	run.begin_break()
 	var choices := UpgradeCatalog.roll(rng, run, 3)
 	break_dialog.show_choices(run.wave, choices)
@@ -214,6 +218,7 @@ func _start_break() -> void:
 
 
 func _on_upgrade_chosen(id: String) -> void:
+	run.upgrades_picked.append(id)
 	var effect := UpgradeCatalog.apply(id, run)
 	match effect:
 		"spawn_imp":
@@ -267,6 +272,7 @@ func _on_place_requested(id: String, cell: Vector2i) -> void:
 func _build(id: String, cell: Vector2i, cost: int) -> void:
 	village.add_building(id, cell)
 	run.buildings_built += 1
+	run.buildings_list.append(id)
 	var at := village.cell_center(cell)
 	match id:
 		"hut":

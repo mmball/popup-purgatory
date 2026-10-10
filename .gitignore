@@ -17,3 +17,4 @@ import.log
 tests.log
 smoke.log
 det_*.log
+runs/

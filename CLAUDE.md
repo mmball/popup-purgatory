@@ -79,8 +79,9 @@ src/desktop/   the gameplay screen and its chrome (Taskbar, StartMenu, BreakDial
 src/screens/   MainMenu, BsodScreen
 src/dev/       dev-only tooling (Autoplay); must never be required at runtime
 src/autoload/  game.gd only ("Game" singleton: run, meta, screen flow, dev args)
-tests/         test_*.gd extending TestCase; run_tests.gd runner
-tools/         test.sh, lint.sh, screenshot.sh
+tests/         test_*.gd extending TestCase; run_tests.gd runner (JUnit via --junit=path)
+tests/screenshots/  committed PNG baselines (folder has .gdignore; never hand-edit)
+tools/         test.sh, lint.sh, botrun.sh, summarize_runs.py, screenshot.sh, screenshot_check.sh, compare_images.gd
 docs/          DESIGN.md (the design doc), img/ (curated screenshots)
 ```
 
@@ -121,17 +122,28 @@ Every run is reproducible from one integer, `RunState.seed`.
 ## Verification loop (run it, don't trust yourself)
 
 ```sh
-tools/test.sh /path/to/godot      # lint -> import -> unit tests -> seeded bot smoke run
-tools/screenshot.sh /path/to/godot  # renders menu/desktop/start menu/break/BSOD to screenshots/
+tools/test.sh /path/to/godot             # lint -> import -> unit tests -> bot smoke run -> determinism
+tools/screenshot_check.sh /path/to/godot # render fixed UI states, compare with tests/screenshots (2%)
+tools/botrun.sh /path/to/godot 10 greedy 100 3   # 10 seeded runs -> runs/*.jsonl -> summary table
 ```
+
+- Screenshot regression is the only check that sees pixels. After any change to drawing
+  or layout: run it, look at `screenshots/diff_*.png` if it fails, and only then decide
+  whether to re-baseline (`--update`) or fix. Re-baselining is a deliberate act: say in
+  the commit message what changed visually.
+- Bot batches are the feedback channel for gameplay changes. After touching catalogs,
+  spawn pacing, imps or RAM: run a greedy and a random batch and read the per-wave table.
+  Give the table to a reviewer (human or model), never the raw JSONL.
+- Dev-arg keys accept `-` or `_` (`--max-wave` and `--max_wave` are the same key).
 
 - Exit codes lie: Godot returns 0 with `SCRIPT ERROR` lines in stderr. `test.sh` greps the
   logs. Do the same for any ad-hoc run (`2>&1 | grep -E "SCRIPT ERROR|ERROR:"`).
 - Headless runs cannot render or receive real input. The autoplay bot (`--autoplay=1`)
   injects synthetic mouse events so GUI code paths execute; anything visual needs the
   Xvfb screenshot path and a look at the PNG.
-- Dev flags (after `--`): `--screen=`, `--demo=1`, `--autoplay=1`, `--seed=N`,
-  `--ui=start|break`, `--noboot`, `--screenshot=path --delay=S --shots=N`.
+- Dev flags (after `--`): `--screen=`, `--demo=1`, `--autoplay=1`, `--policy=greedy|random`,
+  `--runs=N`, `--jsonl=path`, `--max-wave=N`, `--max-seconds=S`, `--seed=N`,
+  `--ui=start|break`, `--noboot`, `--clock="12:00 AM"`, `--screenshot=path --delay=S --shots=N`.
 - Before claiming a visual change works, produce a screenshot and look at it. Before
   claiming a bug is fixed, reproduce it with a seed first.
 - Keep tasks small. One system per change. Run the loop before every commit.

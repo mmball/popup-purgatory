@@ -80,6 +80,9 @@ func _draw_flag(btn: Control, off: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	_blink += delta
+	if Game.dev.has("clock"):
+		_clock.text = str(Game.dev["clock"])  # frozen for screenshot regression
+		return
 	var t := Time.get_time_dict_from_system()
 	_clock.text = "%d:%02d %s" % [((int(t["hour"]) + 11) % 12) + 1, int(t["minute"]), "AM" if int(t["hour"]) < 12 else "PM"]
 

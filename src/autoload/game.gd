@@ -20,10 +20,10 @@ func _ready() -> void:
 
 func start_run() -> void:
 	run = RunState.new()
-	if dev.has("seed"):
-		run.seed = int(dev["seed"])
-	elif requested_seed >= 0:
+	if requested_seed >= 0:
 		run.seed = requested_seed
+	elif dev.has("seed"):
+		run.seed = int(dev["seed"])
 	else:
 		var r := RandomNumberGenerator.new()
 		r.randomize()
@@ -54,7 +54,7 @@ static func _parse_dev_args() -> Dictionary:
 	for arg: String in OS.get_cmdline_user_args():
 		if not arg.begins_with("--"):
 			continue
-		var body := arg.substr(2)
+		var body := arg.substr(2).replace("-", "_")  # --max-wave and --max_wave both work
 		var eq := body.find("=")
 		if eq == -1:
 			out[body] = "1"
