@@ -48,8 +48,10 @@ src/
   screens/                  MainMenu (boot + unlock shop), BsodScreen (run summary)
   dev/autoplay.gd           bot that drives the real GUI with synthetic clicks
 tests/                      headless unit tests + runner
-tools/test.sh               import + tests + smoke run (what CI runs)
+tools/lint.sh               bans Godot 3 APIs, Python idioms, global RNG in gameplay
+tools/test.sh               lint + import + tests + bot smoke run + determinism check (what CI runs)
 tools/screenshot.sh         render screens under Xvfb to screenshots/
+CLAUDE.md                   agent rules: engine pin, static typing, conventions, verification loop
 ```
 
 ## Dev tooling
@@ -57,9 +59,16 @@ tools/screenshot.sh         render screens under Xvfb to screenshots/
 Everything runs headless, so the whole loop works in CI and in a container.
 
 ```sh
-tools/test.sh /path/to/godot          # import, 21 unit tests, 600-frame smoke run with the bot
+tools/test.sh /path/to/godot          # lint, import, 21 unit tests, bot smoke run, determinism check
 godot --headless --path . -s tests/run_tests.gd
 ```
+
+Static typing is enforced by the engine: `project.godot` turns the `untyped_declaration`
+warning into a parse error, so an untyped variable fails the build.
+
+Every run is reproducible from one integer. Type a seed on the main menu, pass `--seed=N`,
+or read it off the BSOD after a crash. Two runs with the same seed and `--fixed-fps 60`
+end in the same state; `tools/test.sh` checks that on every push.
 
 Command-line dev options go after `--`:
 
@@ -68,7 +77,7 @@ Command-line dev options go after `--`:
 | `--screen=menu\|desktop\|bsod` | start on that screen |
 | `--demo=1` | pre-build six buildings, spawn six pop-ups, grant 400 bytes |
 | `--autoplay=1` | the bot plays: closes pop-ups through their real buttons, builds, picks upgrades |
-| `--seed=N` | deterministic spawns and upgrades |
+| `--seed=N` | deterministic run (spawns, upgrades, captcha words, imp wandering) |
 | `--ui=start\|break` | open the Start menu or the wave-break dialog immediately |
 | `--noboot` | skip the boot text on the menu |
 | `--screenshot=path.png --delay=S --shots=N` | save N screenshots S seconds apart, then quit |

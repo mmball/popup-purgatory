@@ -11,11 +11,11 @@ var _claims := {}   ## target id -> claimant id
 
 ## Pick the best unclaimed candidate for the claimant at `from`. Returns the
 ## candidate id, or null when nothing is available.
-func claim(candidates: Array, claimant_id, from: Vector2) -> Variant:
-	var best_id = null
+func claim(candidates: Array, claimant_id: Variant, from: Vector2) -> Variant:
+	var best_id: Variant = null
 	var best_score := -INF
-	for c in candidates:
-		var id = c["id"]
+	for c: Dictionary in candidates:
+		var id: Variant = c["id"]
 		if _claims.has(id) and _claims[id] != claimant_id:
 			continue
 		var pos: Vector2 = c["pos"]
@@ -29,21 +29,21 @@ func claim(candidates: Array, claimant_id, from: Vector2) -> Variant:
 	return best_id
 
 
-func release(target_id) -> void:
+func release(target_id: Variant) -> void:
 	_claims.erase(target_id)
 
 
-func release_claimant(claimant_id) -> void:
-	for id in _claims.keys():
+func release_claimant(claimant_id: Variant) -> void:
+	for id: Variant in _claims.keys():
 		if _claims[id] == claimant_id:
 			_claims.erase(id)
 
 
-func is_claimed(target_id) -> bool:
+func is_claimed(target_id: Variant) -> bool:
 	return _claims.has(target_id)
 
 
-func claimant_of(target_id) -> Variant:
+func claimant_of(target_id: Variant) -> Variant:
 	return _claims.get(target_id)
 
 

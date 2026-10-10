@@ -10,7 +10,7 @@ func _init() -> void:
 	var failed := 0
 	var files := DirAccess.get_files_at(TEST_DIR)
 	files.sort()
-	for file in files:
+	for file: String in files:
 		if not (file.begins_with("test_") and file.ends_with(".gd")) or file == "test_case.gd":
 			continue
 		var script: GDScript = load(TEST_DIR + file)
@@ -19,8 +19,8 @@ func _init() -> void:
 			failed += 1
 			total += 1
 			continue
-		var inst = script.new()
-		for m in inst.get_method_list():
+		var inst: TestCase = script.new()
+		for m: Dictionary in inst.get_method_list():
 			var name: String = m["name"]
 			if not name.begins_with("test_"):
 				continue
@@ -32,7 +32,7 @@ func _init() -> void:
 			else:
 				failed += 1
 				print("FAIL  %s::%s" % [file, name])
-				for f in inst.failures:
+				for f: String in inst.failures:
 					print("        - " + f)
 	print("")
 	print("%d tests, %d failed" % [total, failed])

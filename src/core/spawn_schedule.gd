@@ -32,10 +32,10 @@ func pick_type(wave: int) -> String:
 	var ids := PopupCatalog.available_on_wave(wave)
 	assert(ids.size() > 0, "No popup types available on wave %d" % wave)
 	var total := 0.0
-	for id in ids:
+	for id: String in ids:
 		total += float(PopupCatalog.DEFS[id]["weight"])
 	var roll := rng.randf() * total
-	for id in ids:
+	for id: String in ids:
 		roll -= float(PopupCatalog.DEFS[id]["weight"])
 		if roll <= 0.0:
 			return id

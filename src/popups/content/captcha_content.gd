@@ -31,7 +31,7 @@ func _reroll() -> void:
 	for i in range(5):
 		word += LETTERS[rng.randi_range(0, LETTERS.length() - 1)]
 	var spaced := ""
-	for ch in word:
+	for ch: String in word:
 		spaced += ch + " "
 	_word_label.text = spaced.strip_edges()
 	_input.text = ""

@@ -42,11 +42,11 @@ func _process(delta: float) -> void:
 
 
 ## Spawn later. `near` is a desktop position to cluster around (or null).
-func queue(type_id: String, delay: float, near = null) -> void:
+func queue(type_id: String, delay: float, near: Variant = null) -> void:
 	_queued.append({"type": type_id, "delay": delay, "near": near})
 
 
-func spawn(type_id: String, near = null) -> PopupBase:
+func spawn(type_id: String, near: Variant = null) -> PopupBase:
 	var def := PopupCatalog.get_def(type_id)
 	var popup := PopupBase.new()
 	popup.setup(def, rng, run.close_button_size)
@@ -59,7 +59,7 @@ func spawn(type_id: String, near = null) -> PopupBase:
 	return popup
 
 
-func _pick_position(win_size: Vector2, near) -> Vector2:
+func _pick_position(win_size: Vector2, near: Variant) -> Vector2:
 	var max_x := maxf(MARGIN, layer.size.x - win_size.x - MARGIN)
 	var max_y := maxf(MARGIN, layer.size.y - win_size.y - MARGIN)
 	var p: Vector2

@@ -3,7 +3,7 @@ extends TestCase
 
 func test_rewards_prefer_completion() -> void:
 	var run := RunState.new()
-	for id in PopupCatalog.ids():
+	for id: String in PopupCatalog.ids():
 		var def := PopupCatalog.get_def(id)
 		assert_gt(run.reward_for(def, true), run.reward_for(def, false), id)
 

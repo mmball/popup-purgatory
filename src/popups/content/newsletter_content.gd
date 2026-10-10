@@ -6,7 +6,7 @@ var _checks: Array[CheckBox] = []
 
 func build() -> void:
 	make_label("Join our newsletter! Just confirm your preferences:", 12)
-	for label in ["Daily deals (hourly)", "Partner offers", "Share my address book"]:
+	for label: String in ["Daily deals (hourly)", "Partner offers", "Share my address book"]:
 		var cb := make_check(label, true)
 		_checks.append(cb)
 		add_child(cb)
@@ -15,7 +15,7 @@ func build() -> void:
 	var cont := make_button("Continue")
 	cont.bold_border = true
 	cont.pressed.connect(func() -> void:
-		for cb in _checks:
+		for cb: CheckBox in _checks:
 			if cb.button_pressed:
 				misclick.emit("subscribed")
 				break

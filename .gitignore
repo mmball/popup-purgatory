@@ -13,3 +13,7 @@ Thumbs.db
 
 # Dev output
 screenshots/*.png
+import.log
+tests.log
+smoke.log
+det_*.log

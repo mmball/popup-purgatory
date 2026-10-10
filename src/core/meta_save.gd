@@ -75,7 +75,7 @@ func from_dict(d: Dictionary) -> void:
 	lifetime_bytes = int(d.get("lifetime_bytes", 0))
 	bank = int(d.get("bank", 0))
 	unlocks.clear()
-	for u in d.get("unlocks", []):
+	for u: Variant in d.get("unlocks", []):
 		if PERKS.has(str(u)):
 			unlocks.append(str(u))
 
@@ -96,7 +96,7 @@ func load_from_disk(path: String = PATH) -> bool:
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return false
-	var parsed = JSON.parse_string(f.get_as_text())
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_warning("MetaSave: %s is not valid JSON; ignoring" % path)

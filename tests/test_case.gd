@@ -15,32 +15,32 @@ func assert_false(cond: bool, msg: String = "expected false") -> void:
 		failures.append(msg)
 
 
-func assert_eq(a, b, msg: String = "") -> void:
+func assert_eq(a: Variant, b: Variant, msg: String = "") -> void:
 	if a != b:
 		failures.append("%s expected %s, got %s" % [msg, str(b), str(a)])
 
 
-func assert_ne(a, b, msg: String = "") -> void:
+func assert_ne(a: Variant, b: Variant, msg: String = "") -> void:
 	if a == b:
 		failures.append("%s expected something other than %s" % [msg, str(b)])
 
 
-func assert_gt(a, b, msg: String = "") -> void:
+func assert_gt(a: Variant, b: Variant, msg: String = "") -> void:
 	if not (a > b):
 		failures.append("%s expected %s > %s" % [msg, str(a), str(b)])
 
 
-func assert_ge(a, b, msg: String = "") -> void:
+func assert_ge(a: Variant, b: Variant, msg: String = "") -> void:
 	if not (a >= b):
 		failures.append("%s expected %s >= %s" % [msg, str(a), str(b)])
 
 
-func assert_lt(a, b, msg: String = "") -> void:
+func assert_lt(a: Variant, b: Variant, msg: String = "") -> void:
 	if not (a < b):
 		failures.append("%s expected %s < %s" % [msg, str(a), str(b)])
 
 
-func assert_le(a, b, msg: String = "") -> void:
+func assert_le(a: Variant, b: Variant, msg: String = "") -> void:
 	if not (a <= b):
 		failures.append("%s expected %s <= %s" % [msg, str(a), str(b)])
 

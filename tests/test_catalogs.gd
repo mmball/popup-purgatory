@@ -2,12 +2,12 @@ extends TestCase
 
 
 func test_building_costs_grow() -> void:
-	for id in BuildingCatalog.DEFS.keys():
+	for id: String in BuildingCatalog.DEFS.keys():
 		assert_eq(BuildingCatalog.cost(id, 0), int(BuildingCatalog.DEFS[id]["cost"]), id + " base cost")
 		assert_gt(BuildingCatalog.cost(id, 1), BuildingCatalog.cost(id, 0), id + " grows")
 		assert_gt(BuildingCatalog.max_count(id), 0, id + " max")
 	assert_eq(BuildingCatalog.ORDER.size(), BuildingCatalog.DEFS.size(), "every building is in the menu order")
-	for id in BuildingCatalog.ORDER:
+	for id: String in BuildingCatalog.ORDER:
 		assert_true(BuildingCatalog.DEFS.has(id), "ordered id exists: " + id)
 
 
@@ -19,7 +19,7 @@ func test_upgrade_roll_is_distinct_and_respects_max() -> void:
 		var picks := UpgradeCatalog.roll(rng, run, 3)
 		assert_eq(picks.size(), 3, "three picks")
 		var ids := {}
-		for p in picks:
+		for p: Dictionary in picks:
 			ids[p["id"]] = true
 		assert_eq(ids.size(), 3, "distinct picks")
 	UpgradeCatalog.apply("antivirus_patch", run)

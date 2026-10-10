@@ -93,7 +93,7 @@ static func build_theme() -> Theme:
 
 	t.set_color("font_color", "Label", BLACK)
 
-	for cls in ["CheckBox", "CheckButton", "Button"]:
+	for cls: String in ["CheckBox", "CheckButton", "Button"]:
 		t.set_color("font_color", cls, BLACK)
 		t.set_color("font_hover_color", cls, BLACK)
 		t.set_color("font_pressed_color", cls, BLACK)
@@ -101,7 +101,7 @@ static func build_theme() -> Theme:
 		t.set_color("font_focus_color", cls, BLACK)
 		t.set_color("font_disabled_color", cls, GRAY_DARK)
 		var empty := StyleBoxEmpty.new()
-		for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+		for st: String in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 			t.set_stylebox(st, cls, empty)
 
 	t.set_color("font_color", "LinkButton", LINK)

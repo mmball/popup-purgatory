@@ -33,7 +33,7 @@ func _ready() -> void:
 
 
 func deselect_icons() -> void:
-	for i in _icons:
+	for i: DesktopIcon in _icons:
 		i.deselect()
 
 
@@ -97,7 +97,7 @@ func cell_free(cell: Vector2i) -> bool:
 
 func count(id: String) -> int:
 	var n := 0
-	for b in buildings.values():
+	for b: Building in buildings.values():
 		if b.id == id:
 			n += 1
 	return n

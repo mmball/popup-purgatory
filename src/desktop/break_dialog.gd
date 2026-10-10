@@ -30,9 +30,9 @@ func _init() -> void:
 
 func show_choices(wave: int, choices: Array[Dictionary]) -> void:
 	_intro.text = "Wave %d survived. The pop-ups are regrouping. Pick one upgrade:" % wave
-	for c in _cards.get_children():
+	for c: Node in _cards.get_children():
 		c.queue_free()
-	for def in choices:
+	for def: Dictionary in choices:
 		_cards.add_child(_make_card(def))
 	visible = true
 	raise()

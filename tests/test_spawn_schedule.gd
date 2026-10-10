@@ -45,11 +45,11 @@ func test_deterministic_with_seed() -> void:
 
 
 func test_catalog_is_well_formed() -> void:
-	for id in PopupCatalog.ids():
+	for id: String in PopupCatalog.ids():
 		var d := PopupCatalog.get_def(id)
 		assert_eq(d["id"], id, "id round-trip")
 		assert_true(ResourceLoader.exists(str(d["content"])), "content script exists for " + id)
-		var script = load(str(d["content"]))
+		var script: Variant = load(str(d["content"]))
 		assert_true(script != null, "content script loads for " + id)
 		assert_gt(int(d["ram_cost"]), 0, id + " ram cost")
 		assert_gt(float(d["weight"]), 0.0, id + " weight")

@@ -20,7 +20,7 @@ func build() -> void:
 	p3.add_child(_label("Setup is ready to finish."))
 	p3.add_child(_label("Click Finish to exit the wizard."))
 	_pages = [p1, p2, p3]
-	for p in _pages:
+	for p: Control in _pages:
 		p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		add_child(p)
 	var row := make_row(BoxContainer.ALIGNMENT_END)

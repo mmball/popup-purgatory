@@ -23,10 +23,8 @@ var _confirm: ConfirmDialog
 
 func _ready() -> void:
 	run = Game.run
-	if run.seed >= 0:
-		rng.seed = run.seed
-	else:
-		rng.randomize()
+	assert(run.seed >= 0, "Game.start_run() must assign a seed before the desktop opens")
+	rng.seed = run.seed
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -65,6 +63,7 @@ func _ready() -> void:
 	taskbar.position = Vector2(0, DESKTOP_H)
 	taskbar.size = Vector2(1280, TASKBAR_H)
 	taskbar.start_pressed.connect(_toggle_start_menu)
+	taskbar.tooltip_text = "Run seed: %d" % run.seed
 	add_child(taskbar)
 
 	start_menu = StartMenu.new()
@@ -84,7 +83,7 @@ func _ready() -> void:
 	add_child(spawner)
 
 	imp_manager = ImpManager.new()
-	imp_manager.setup(run, imp_layer, popup_layer)
+	imp_manager.setup(run, rng, imp_layer, popup_layer)
 	add_child(imp_manager)
 
 	run.crashed.connect(_on_crashed)
@@ -105,7 +104,7 @@ func _ready() -> void:
 
 
 func _place_starting_buildings() -> void:
-	for id in run.starting_buildings:
+	for id: String in run.starting_buildings:
 		var cell := village.first_free_cell()
 		if cell.x >= 0:
 			_build(id, cell, 0)
@@ -114,11 +113,11 @@ func _place_starting_buildings() -> void:
 ## Fills the desk for screenshots and smoke tests.
 func _demo_setup() -> void:
 	run.add_bytes(400)
-	for id in ["hut", "hut", "hut", "dojo", "coffee", "ram"]:
+	for id: String in ["hut", "hut", "hut", "dojo", "coffee", "ram"]:
 		var cell := village.first_free_cell()
 		if cell.x >= 0:
 			_build(id, cell, 0)
-	for t in ["ad", "error", "survey", "update", "captcha", "virus"]:
+	for t: String in ["ad", "error", "survey", "update", "captcha", "virus"]:
 		spawner.spawn(t)
 
 
@@ -220,7 +219,7 @@ func _on_upgrade_chosen(id: String) -> void:
 		"spawn_imp":
 			imp_manager.spawn_imp(Vector2(rng.randf_range(200, 1000), rng.randf_range(100, 600)))
 		"resize_x":
-			for p in popup_layer.get_children():
+			for p: Node in popup_layer.get_children():
 				if p is PopupBase:
 					p.set_close_button_size(run.close_button_size)
 	break_dialog.visible = false
@@ -325,6 +324,14 @@ func _end(reason: String) -> void:
 	set_process(false)
 	spawner.active = false
 	Game.call_deferred("end_run", reason)
+
+
+func _exit_tree() -> void:
+	# One line per run for log-diffing seeded replays (see CLAUDE.md, Determinism).
+	if run != null:
+		print("seed=%d state wave=%d bytes=%d score=%d ram=%d/%d spawned=%d closed=%d completed=%d imps=%d buildings=%d" % [
+			run.seed, run.wave, run.bytes, run.score, run.ram_used, run.ram_max,
+			run.popups_spawned, run.popups_closed, run.popups_completed, imp_manager.imps.size(), run.buildings_built])
 
 
 # ---------- input ----------

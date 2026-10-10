@@ -51,6 +51,7 @@ func _draw() -> void:
 		lines.append("  Imps hired .......... %d" % run.imps_hired)
 		lines.append("  Buildings built ..... %d" % run.buildings_built)
 		lines.append("  Time at the desk .... %d:%02d" % [int(run.elapsed) / 60, int(run.elapsed) % 60])
+		lines.append("  Run seed ............ %d" % run.seed)
 		var meta: MetaSave = Game.meta
 		if meta != null and run.score > 0 and run.score >= meta.high_score:
 			lines.append("")
@@ -64,6 +65,6 @@ func _draw() -> void:
 	draw_rect(Rect2(cx - ts.x * 0.5, y - 2, ts.x, ts.y + 4), Win98.GRAY)
 	Win98.draw_text(self, Vector2(cx - ts.x * 0.5, y), " POPUP PURGATORY ", Win98.BSOD_BLUE, 16)
 	y += 50
-	for line in lines:
+	for line: String in lines:
 		Win98.draw_text(self, Vector2(160, y), line, Win98.WHITE, 15)
 		y += 24

@@ -11,6 +11,7 @@ const ARRIVE_DIST := 4.0
 
 var manager: Node          ## ImpManager
 var run: RunState
+var rng: RandomNumberGenerator   ## the run's RNG, handed down by ImpManager
 var home := Vector2.ZERO
 var trained := false:
 	set(v):
@@ -30,7 +31,7 @@ var _work_total := 1.0
 
 
 func _ready() -> void:
-	_t = randf() * 10.0
+	_t = rng.randf() * 10.0
 	_wander_target = home
 	z_index = 5
 
@@ -63,8 +64,8 @@ func _idle(delta: float) -> void:
 			return
 	_wander_timer -= delta
 	if _wander_timer <= 0.0:
-		_wander_timer = randf_range(1.0, 2.5)
-		_wander_target = home + Vector2(randf_range(-50, 50), randf_range(-30, 30))
+		_wander_timer = rng.randf_range(1.0, 2.5)
+		_wander_target = home + Vector2(rng.randf_range(-50, 50), rng.randf_range(-30, 30))
 	_move_toward(_wander_target, speed() * 0.4, delta)
 
 

@@ -24,7 +24,7 @@ class MenuItem extends Button:
 	func _init() -> void:
 		focus_mode = Control.FOCUS_NONE
 		var empty := StyleBoxEmpty.new()
-		for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+		for st: String in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 			add_theme_stylebox_override(st, empty)
 		mouse_entered.connect(queue_redraw)
 		mouse_exited.connect(queue_redraw)

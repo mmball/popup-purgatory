@@ -141,14 +141,14 @@ static func get_def(id: String) -> Dictionary:
 
 static func ids() -> Array[String]:
 	var out: Array[String] = []
-	for k in DEFS.keys():
+	for k: String in DEFS.keys():
 		out.append(k)
 	return out
 
 
 static func available_on_wave(wave: int) -> Array[String]:
 	var out: Array[String] = []
-	for k in DEFS.keys():
+	for k: String in DEFS.keys():
 		if int(DEFS[k]["min_wave"]) <= wave:
 			out.append(k)
 	return out

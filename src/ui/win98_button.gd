@@ -19,7 +19,7 @@ func _init(p_label: String = "", p_min_size: Vector2 = Vector2(75, 23)) -> void:
 	focus_mode = Control.FOCUS_NONE
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	var empty := StyleBoxEmpty.new()
-	for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+	for st: String in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 		add_theme_stylebox_override(st, empty)
 
 

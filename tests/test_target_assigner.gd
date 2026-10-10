@@ -11,10 +11,10 @@ func _cands() -> Array:
 
 func test_no_double_claims() -> void:
 	var ta := TargetAssigner.new()
-	var first = ta.claim(_cands(), "imp1", Vector2.ZERO)
-	var second = ta.claim(_cands(), "imp2", Vector2.ZERO)
-	var third = ta.claim(_cands(), "imp3", Vector2.ZERO)
-	var fourth = ta.claim(_cands(), "imp4", Vector2.ZERO)
+	var first: Variant = ta.claim(_cands(), "imp1", Vector2.ZERO)
+	var second: Variant = ta.claim(_cands(), "imp2", Vector2.ZERO)
+	var third: Variant = ta.claim(_cands(), "imp3", Vector2.ZERO)
+	var fourth: Variant = ta.claim(_cands(), "imp4", Vector2.ZERO)
 	assert_ne(first, second, "distinct 1/2")
 	assert_ne(second, third, "distinct 2/3")
 	assert_ne(first, third, "distinct 1/3")

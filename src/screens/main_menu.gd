@@ -61,7 +61,7 @@ func _build_desktop() -> void:
 	_welcome = WindowFrame.new()
 	_welcome.window_title = "Welcome to Popup Purgatory 98"
 	_welcome.closable = false
-	_welcome.set_window_size(Vector2(420, 330))
+	_welcome.set_window_size(Vector2(420, 360))
 	add_child(_welcome)
 	_welcome.position = Vector2(430, 170)
 
@@ -91,13 +91,32 @@ func _build_desktop() -> void:
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
 
+	var seed_row := HBoxContainer.new()
+	seed_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	seed_row.add_theme_constant_override("separation", 6)
+	box.add_child(seed_row)
+	var seed_label := Label.new()
+	seed_label.text = "Seed (blank = random):"
+	seed_label.add_theme_font_size_override("font_size", 11)
+	seed_row.add_child(seed_label)
+	var seed_edit := LineEdit.new()
+	seed_edit.custom_minimum_size = Vector2(120, 22)
+	seed_edit.placeholder_text = "e.g. 42"
+	seed_edit.add_theme_font_size_override("font_size", 11)
+	if Game.requested_seed >= 0:
+		seed_edit.text = str(Game.requested_seed)
+	seed_row.add_child(seed_edit)
+
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 10)
 	box.add_child(row)
 	var start := Win98Button.new("Start Run", Vector2(110, 26))
 	start.bold_border = true
-	start.pressed.connect(func() -> void: Game.start_run())
+	start.pressed.connect(func() -> void:
+		var typed := seed_edit.text.strip_edges()
+		Game.requested_seed = int(typed) if typed.is_valid_int() and int(typed) >= 0 else -1
+		Game.start_run())
 	row.add_child(start)
 	var shop := Win98Button.new("Unlocks", Vector2(110, 26))
 	shop.pressed.connect(_toggle_shop)
@@ -135,13 +154,13 @@ func _toggle_shop() -> void:
 
 
 func _fill_shop() -> void:
-	for c in _shop.content.get_children():
+	for c: Node in _shop.content.get_children():
 		c.queue_free()
 	var meta: MetaSave = Game.meta
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	_shop.content.add_child(box)
-	for id in MetaSave.PERKS.keys():
+	for id: String in MetaSave.PERKS.keys():
 		var perk: Dictionary = MetaSave.PERKS[id]
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)

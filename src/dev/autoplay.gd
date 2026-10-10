@@ -14,6 +14,12 @@ var _clicks := 0
 
 func _ready() -> void:
 	rng.seed = 12345
+	# Headless has a 0x0 OS window, and with stretch mode "canvas_items" that
+	# collapses the GUI transform to a zero determinant, so hit-testing finds
+	# nothing. Giving the root window a real size restores it (Godot 4.3,
+	# viewport.cpp _gui_find_control_at_pos).
+	if DisplayServer.get_name() == "headless":
+		get_tree().root.size = Vector2i(1280, 720)
 	print("autoplay: on")
 
 
@@ -85,7 +91,7 @@ func _center(c: Control) -> Vector2:
 func _find_button(root: Node, label: String) -> Win98Button:
 	if root is Win98Button and root.label == label and root.visible:
 		return root
-	for c in root.get_children():
+	for c: Node in root.get_children():
 		var f := _find_button(c, label)
 		if f != null and f.is_visible_in_tree():
 			return f
@@ -95,7 +101,7 @@ func _find_button(root: Node, label: String) -> Win98Button:
 func _find_link(root: Node) -> LinkButton:
 	if root is LinkButton:
 		return root
-	for c in root.get_children():
+	for c: Node in root.get_children():
 		var f := _find_link(c)
 		if f != null:
 			return f
@@ -104,14 +110,17 @@ func _find_link(root: Node) -> LinkButton:
 
 func _click(pos: Vector2) -> void:
 	_clicks += 1
+	# push_input delivers straight to the viewport's GUI path, which also works
+	# headless; Input.parse_input_event needs a real display server window.
+	var vp := get_viewport()
 	var mm := InputEventMouseMotion.new()
 	mm.position = pos
 	mm.global_position = pos
-	Input.parse_input_event(mm)
-	for pressed in [true, false]:
+	vp.push_input(mm)
+	for pressed: bool in [true, false]:
 		var ev := InputEventMouseButton.new()
 		ev.button_index = MOUSE_BUTTON_LEFT
 		ev.pressed = pressed
 		ev.position = pos
 		ev.global_position = pos
-		Input.parse_input_event(ev)
+		vp.push_input(ev)

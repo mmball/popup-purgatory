@@ -28,7 +28,7 @@ static func get_def(id: String) -> Dictionary:
 
 static func eligible(run: RunState) -> Array[String]:
 	var out: Array[String] = []
-	for id in DEFS.keys():
+	for id: String in DEFS.keys():
 		var picked: int = int(run.upgrade_counts.get(id, 0))
 		if picked >= int(DEFS[id]["max"]):
 			continue
