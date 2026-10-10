@@ -8,6 +8,9 @@ cd "$(dirname "$0")/.."
 GODOT="${1:-${GODOT:-godot}}"
 OUT="${2:-screenshots}"
 mkdir -p "$OUT"
+# The import step builds .godot/global_script_class_cache.cfg; without it every
+# class_name fails to resolve on a fresh checkout (CI) even though scripts parse.
+"$GODOT" --headless --path . --import >"$OUT/import.log" 2>&1 || true
 # Each render is capped at 120 s so a hung renderer fails the step instead of
 # stalling CI; the full engine output of every render is kept in $OUT/*.log.
 run() {
