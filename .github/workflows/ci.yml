@@ -10,11 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Godot 4.3 (headless-capable Linux build)
+      - name: Install Godot 4.7 (headless-capable Linux build)
         run: |
-          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
           unzip -q godot.zip
-          mv Godot_v4.3-stable_linux.x86_64 godot
+          mv Godot_v4.7-stable_linux.x86_64 godot
           chmod +x godot
 
       - name: Import, unit tests, smoke run

@@ -17,6 +17,9 @@ fi
 echo "== unit tests"
 "$GODOT" --headless --path . -s tests/run_tests.gd 2>&1 | tee tests.log
 grep -q " 0 failed" tests.log
+if grep -E "SCRIPT ERROR|ERROR:" tests.log | grep -v -i "audio\|alsa"; then
+  echo "unit test run logged script errors"; exit 1
+fi
 
 echo "== smoke run (desktop, demo mode, 600 frames)"
 "$GODOT" --headless --path . --quit-after 600 -- --screen=desktop --demo=1 --autoplay=1 --seed=1 2>&1 | tee smoke.log

@@ -5,14 +5,14 @@ pop-up asks (rate the survey, install the update, uncheck the newsletter boxes) 
 than X-ing it out. Spend what you earn on a village of imps who close pop-ups for you.
 Run out of system resources and the machine blue-screens. That's the run.
 
-Built with [Godot 4.3](https://godotengine.org). No image assets: every window, button,
+Built with [Godot 4.7](https://godotengine.org). No image assets: every window, button,
 imp and building is drawn in code.
 
 ![desktop](docs/img/desktop.png)
 
 ## Play
 
-1. Install Godot 4.3 (standard build, not .NET).
+1. Install Godot 4.7 (standard build, not .NET).
 2. Open `project.godot` in the editor and press F5, or run from a terminal:
 
    ```sh
