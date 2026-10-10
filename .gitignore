@@ -1,0 +1,15 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+export/
+*.translation
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dev output
+screenshots/*.png
