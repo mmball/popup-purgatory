@@ -132,11 +132,24 @@ const DEFS := {
 }
 
 
+const TUNABLE_INT := ["ram_cost", "dismiss_reward", "complete_reward"]
+const TUNABLE_FLOAT := ["lifetime", "weight", "imp_complete_time"]
+
+
 static func get_def(id: String) -> Dictionary:
 	assert(DEFS.has(id), "Unknown popup type: " + id)
 	var d: Dictionary = DEFS[id].duplicate(true)
 	d["id"] = id
+	for f: String in TUNABLE_INT:
+		d[f] = Tuning.inum("popup.%s.%s" % [id, f], int(d[f]))
+	for f: String in TUNABLE_FLOAT:
+		d[f] = Tuning.num("popup.%s.%s" % [id, f], float(d[f]))
 	return d
+
+
+## Spawn weight after tuning (the schedule reads this, not DEFS directly).
+static func weight(id: String) -> float:
+	return Tuning.num("popup.%s.weight" % id, float(DEFS[id]["weight"]))
 
 
 static func ids() -> Array[String]:

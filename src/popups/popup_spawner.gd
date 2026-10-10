@@ -52,6 +52,7 @@ func spawn(type_id: String, near: Variant = null) -> PopupBase:
 	popup.setup(def, rng, run.close_button_size)
 	popup.ram_cost = run.popup_cost(def)
 	popup.drag_bounds = Rect2(Vector2.ZERO, layer.size)
+	popup.spawned_near = near is Vector2
 	popup.position = _pick_position(popup.size, near)
 	layer.add_child(popup)
 	run.popup_opened(popup.ram_cost)

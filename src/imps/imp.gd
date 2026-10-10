@@ -38,7 +38,7 @@ func _ready() -> void:
 
 func speed() -> float:
 	var m := run.imp_speed_mult if run != null else 1.0
-	return BASE_SPEED * m
+	return Tuning.num("imp.base_speed", BASE_SPEED) * m
 
 
 func _process(delta: float) -> void:
@@ -88,7 +88,7 @@ func _seek(delta: float) -> void:
 	if _move_toward(dest, speed(), delta) <= ARRIVE_DIST:
 		state = State.WORK
 		var will_complete := trained
-		_work_total = (target.imp_complete_time() if will_complete else DISMISS_TIME)
+		_work_total = (target.imp_complete_time() if will_complete else Tuning.num("imp.dismiss_time", DISMISS_TIME))
 		_work_total *= run.imp_work_mult if run != null else 1.0
 		_work_left = _work_total
 

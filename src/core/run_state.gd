@@ -21,7 +21,7 @@ var seed := -1
 # --- resources ---
 var bytes := 0            ## spendable currency
 var score := 0            ## total bytes ever earned this run
-var ram_max := BASE_RAM
+var ram_max := Tuning.inum("run.base_ram", BASE_RAM)
 var ram_used := 0
 
 # --- wave clock ---
@@ -79,12 +79,16 @@ func summary() -> Dictionary:
 		"elapsed": snappedf(elapsed, 0.01), "spawned": popups_spawned, "closed": popups_closed,
 		"completed": popups_completed, "player_closes": player_closes, "imp_closes": imp_closes,
 		"imps_hired": imps_hired, "buildings_built": buildings_built, "buildings": buildings_list,
-		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log,
+		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log, "tune": Tuning.spec,
 	}
 
 
 static func wave_duration(w: int) -> float:
-	return 40.0 + 5.0 * (w - 1)
+	return Tuning.num("run.wave_base", 40.0) + Tuning.num("run.wave_step", 5.0) * (w - 1)
+
+
+static func overload_grace() -> float:
+	return Tuning.num("run.overload_grace", OVERLOAD_GRACE)
 
 
 func start_wave(w: int) -> void:
@@ -186,7 +190,7 @@ func _check_overload(delta: float) -> void:
 	if ram_used > ram_max:
 		overload_timer += delta
 		_set_overloaded(true)
-		if overload_timer >= OVERLOAD_GRACE:
+		if overload_timer >= overload_grace():
 			crash("OUT_OF_MEMORY")
 	else:
 		overload_timer = 0.0
@@ -199,7 +203,7 @@ func _set_overloaded(active: bool) -> void:
 	if not active:
 		overload_timer = 0.0
 	if changed or active:
-		overload_changed.emit(active, maxf(0.0, OVERLOAD_GRACE - overload_timer))
+		overload_changed.emit(active, maxf(0.0, overload_grace() - overload_timer))
 
 
 func crash(reason: String) -> void:

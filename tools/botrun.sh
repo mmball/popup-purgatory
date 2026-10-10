@@ -11,6 +11,7 @@ OUT="runs/${POLICY}_${SEED}.jsonl"
 # --quit-after is a hard cap in frames in case a run never ends.
 "$GODOT" --headless --fixed-fps 60 --path . --quit-after $((RUNS * MAXW * 60 * 90)) -- \
   --screen=desktop --autoplay=1 --policy="$POLICY" --runs="$RUNS" --seed="$SEED" \
-  --max-wave="$MAXW" --jsonl="$OUT" 2>&1 | grep -E "^autoplay run|SCRIPT ERROR" | sed 's/: {.*//'
+  --max-wave="$MAXW" --jsonl="$OUT" --telemetry-dir=runs/telemetry 2>&1 | tee "runs/${POLICY}_${SEED}.log" | { grep -E "^autoplay run|SCRIPT ERROR" || true; } | sed 's/: {.*//'
+if grep -q "SCRIPT ERROR" "runs/${POLICY}_${SEED}.log"; then echo "bot batch logged script errors"; exit 1; fi
 echo "wrote $OUT ($(wc -l < "$OUT") runs)"
 python3 tools/summarize_runs.py "$OUT"

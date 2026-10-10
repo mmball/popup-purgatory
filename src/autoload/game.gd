@@ -14,8 +14,12 @@ var requested_seed := -1
 
 func _ready() -> void:
 	meta = MetaSave.new()
-	meta.load_from_disk()
 	dev = _parse_dev_args()
+	if not dev.has("fresh_meta"):  # --fresh-meta: ignore the save file (screenshot regression)
+		meta.load_from_disk()
+	if dev.has("tune"):
+		Tuning.load_from_string(str(dev["tune"]))
+		print("tune=%s" % Tuning.spec)
 
 
 func start_run() -> void:

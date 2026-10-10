@@ -6,9 +6,12 @@ extends Node
 ##
 ## Flags (after `--`):
 ##   --autoplay=1          enable
-##   --policy=greedy|random  greedy: oldest pop-up, prefer completion, buy the
+##   --policy=greedy|random|external
+##                         greedy: oldest pop-up, prefer completion, buy the
 ##                         first affordable building, first upgrade (default)
 ##                         random: uniformly random legal clicks
+##                         external: ask a driver process (tools/policy_driver.py)
+##                         through files in --policy-dir; see _step_external
 ##   --runs=N              play N runs (seed, seed+1, ...) then quit; default 1
 ##   --jsonl=path          append one JSON line per finished run (RunState.summary())
 ##   --max-wave=N / --max-seconds=S  end a run early (handled by Desktop)
@@ -25,6 +28,14 @@ var _t := 0.0
 var _clicks := 0
 var _jsonl: FileAccess
 var _main: Control
+
+# external policy state
+var _policy_dir := ""
+var _decision_seq := 0
+var _decision_interval := 1.0
+var _decision_timeout := 120.0
+var _pending := false
+var _since_decision := 0.0
 
 
 func _ready() -> void:
@@ -46,6 +57,11 @@ func _ready() -> void:
 	Game.screen_requested.connect(_on_screen_requested)
 	if Game.run != null:
 		_seed_for_run(Game.run)  # the first run started before this node existed
+	if policy == "external":
+		_policy_dir = str(dev.get("policy_dir", "runs/policy"))
+		_decision_interval = float(dev.get("decision_interval", "1.0"))
+		_decision_timeout = float(dev.get("decision_timeout", "120"))
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_policy_dir))
 	print("autoplay: on policy=%s runs=%d" % [policy, runs_wanted])
 
 
@@ -104,10 +120,153 @@ func _step_menu(menu: MainMenu) -> void:
 
 
 func _step_desktop(desktop: Desktop) -> void:
-	if policy == "random":
-		_step_random(desktop)
+	match policy:
+		"random":
+			_step_random(desktop)
+		"external":
+			_step_external(desktop)
+		_:
+			_step_greedy(desktop)
+
+
+# ---------- external ----------
+## Protocol: the bot writes <dir>/state_<seq>.json with the game state and the
+## legal moves, then blocks (game time pauses with --fixed-fps) until the driver
+## writes <dir>/move_<seq>.json {"move": "<id>"}. Menus, placement and the break
+## dialog are handled by the greedy rules; the driver only decides the strategic
+## moves: which pop-up to work on and how, what to build, which upgrade to take.
+
+func _step_external(desktop: Desktop) -> void:
+	var run := desktop.run
+	# Mechanical sub-steps the driver should not have to micro-manage.
+	if desktop._confirm != null:
+		_click(_center(_find_button(desktop._confirm, "No")))
+		return
+	if desktop.village.is_placing():
+		var cell := desktop.village.first_free_cell()
+		if cell.x >= 0:
+			_click(desktop.village.cell_center(cell))
+		else:
+			desktop.village.cancel_place()
+		return
+	_since_decision += TICK
+	if _since_decision < _decision_interval and not desktop.break_dialog.visible:
+		return
+	_since_decision = 0.0
+	var state := _external_state(desktop)
+	var moves: Array = state["legal_moves"]
+	if moves.size() <= 1:
+		return  # only "wait": nothing to decide
+	var move_id := _ask_driver(state)
+	_apply_external_move(desktop, move_id, moves)
+
+
+func _external_state(desktop: Desktop) -> Dictionary:
+	var run := desktop.run
+	var moves: Array[Dictionary] = [{"id": "wait", "kind": "wait", "desc": "do nothing this second"}]
+	var popups: Array[Dictionary] = []
+	if desktop.break_dialog.visible:
+		for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
+			var card := b.get_parent().get_parent()
+			var name_l: Label = card.get_child(0).get_child(0) if card.get_child(0).get_child_count() > 0 else null
+			var upgrade_name := name_l.text if name_l != null else "?"
+			var uid := ""
+			for d: String in UpgradeCatalog.DEFS.keys():
+				if UpgradeCatalog.DEFS[d]["name"] == upgrade_name:
+					uid = d
+			moves.append({"id": "pick:" + uid, "kind": "pick_upgrade", "upgrade": uid, "desc": str(UpgradeCatalog.DEFS[uid]["desc"]) if uid != "" else upgrade_name})
 	else:
-		_step_greedy(desktop)
+		for p: PopupBase in desktop.imp_manager.live_popups():
+			var pid := p.get_instance_id()
+			var entry := {"id": pid, "type": p.type_id, "age": snappedf(p.total_age, 0.1), "ram_cost": p.ram_cost,
+				"dismiss_reward": run.reward_for(p.def, false), "complete_reward": run.reward_for(p.def, true),
+				"x_locked": p.x_locked(), "lifetime": float(p.def.get("lifetime", 0.0)), "age_since_timeout": snappedf(p.age, 0.1),
+				"timeout_kind": str(p.def.get("on_timeout", {}).get("kind", "none")), "cheap_complete": _completion_control(p) != null}
+			popups.append(entry)
+			if not p.x_locked():
+				moves.append({"id": "dismiss:%d" % pid, "kind": "dismiss", "popup": pid, "desc": "X the %s (+%d bytes)" % [p.type_id, entry["dismiss_reward"]]})
+			if _completion_control(p) != null:
+				moves.append({"id": "complete:%d" % pid, "kind": "complete", "popup": pid, "desc": "complete the %s in one click (+%d bytes)" % [p.type_id, entry["complete_reward"]]})
+		for id: String in BuildingCatalog.ORDER:
+			var owned := desktop.village.count(id)
+			var cost := BuildingCatalog.cost(id, owned)
+			if owned < BuildingCatalog.max_count(id) and run.bytes >= cost and desktop.village.first_free_cell().x >= 0:
+				moves.append({"id": "build:" + id, "kind": "build", "building": id, "cost": cost, "desc": "%s (%d bytes): %s" % [BuildingCatalog.DEFS[id]["name"], cost, BuildingCatalog.DEFS[id]["desc"]]})
+	var buildings := {}
+	for id: String in BuildingCatalog.ORDER:
+		buildings[id] = desktop.village.count(id)
+	return {
+		"seq": _decision_seq, "seed": run.seed, "t": snappedf(run.elapsed, 0.1), "wave": run.wave,
+		"wave_time_left": snappedf(run.wave_time_left, 0.1), "in_break": run.in_break,
+		"bytes": run.bytes, "score": run.score, "ram_used": run.ram_used, "ram_max": run.ram_max,
+		"overloaded": run.overloaded, "imps": desktop.imp_manager.imps.size(), "trained": desktop.imp_manager.count_trained(),
+		"buildings": buildings, "upgrades": run.upgrades_picked, "popups": popups, "legal_moves": moves,
+	}
+
+
+## Writes the state, blocks until the move file appears, returns the move id
+## (or "wait" on timeout so a dead driver degrades to idling, not hanging).
+func _ask_driver(state: Dictionary) -> String:
+	var base := ProjectSettings.globalize_path(_policy_dir)
+	var state_path := "%s/state_%d.json" % [base, _decision_seq]
+	var move_path := "%s/move_%d.json" % [base, _decision_seq]
+	var f := FileAccess.open(state_path + ".tmp", FileAccess.WRITE)
+	if f == null:
+		push_error("Autoplay: cannot write " + state_path)
+		return "wait"
+	f.store_string(JSON.stringify(state))
+	f.close()
+	DirAccess.rename_absolute(state_path + ".tmp", state_path)  # atomic publish
+	var waited := 0.0
+	while not FileAccess.file_exists(move_path):
+		OS.delay_msec(20)
+		waited += 0.02
+		if waited >= _decision_timeout:
+			push_warning("Autoplay: driver timed out on decision %d" % _decision_seq)
+			_decision_seq += 1
+			return "wait"
+	OS.delay_msec(5)  # let the writer finish
+	var mf := FileAccess.open(move_path, FileAccess.READ)
+	var parsed: Variant = JSON.parse_string(mf.get_as_text()) if mf != null else null
+	if mf != null:
+		mf.close()
+	_decision_seq += 1
+	if parsed is Dictionary and parsed.has("move"):
+		return str(parsed["move"])
+	push_warning("Autoplay: malformed move file " + move_path)
+	return "wait"
+
+
+func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> void:
+	var legal := false
+	for m: Dictionary in moves:
+		if m["id"] == move_id:
+			legal = true
+	if not legal:
+		push_warning("Autoplay: driver chose illegal move '%s'; waiting" % move_id)
+		return
+	var parts := move_id.split(":", true, 1)
+	match parts[0]:
+		"wait":
+			pass
+		"dismiss", "complete":
+			var p := instance_from_id(int(parts[1])) as PopupBase
+			if p == null or p.is_closing:
+				return
+			var btn: Control = p.close_button if parts[0] == "dismiss" else _completion_control(p)
+			if btn != null:
+				_click(_center(btn))
+		"build":
+			var idx := BuildingCatalog.ORDER.find(parts[1])
+			if idx >= 0:
+				desktop._begin_place(BuildingCatalog.ORDER[idx])  # placement is finished by the mechanical rules
+		"pick":
+			for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
+				var card := b.get_parent().get_parent()
+				var name_l: Label = card.get_child(0).get_child(0)
+				if UpgradeCatalog.DEFS.has(parts[1]) and name_l.text == UpgradeCatalog.DEFS[parts[1]]["name"]:
+					_click(_center(b))
+					return
 
 
 # ---------- greedy ----------
@@ -170,7 +329,7 @@ func _completion_control(p: PopupBase) -> Control:
 
 func _step_random(desktop: Desktop) -> void:
 	if desktop.break_dialog.visible:
-		var picks := _find_all(desktop.break_dialog, "Win98Button")
+		var picks := _find_all(desktop.break_dialog, _is_win98_button)
 		if not picks.is_empty():
 			_click(_center(picks[rng.randi_range(0, picks.size() - 1)]))
 		return
@@ -200,7 +359,7 @@ func _step_random(desktop: Desktop) -> void:
 	var targets: Array[Control] = []
 	if not p.x_locked():
 		targets.append(p.close_button)
-	for c: Control in _find_all(p.content, "BaseButton"):
+	for c: Control in _find_all(p.content, _is_base_button):
 		if c.is_visible_in_tree() and not (c is Button and c.disabled):
 			targets.append(c)
 	if targets.is_empty():
@@ -244,13 +403,23 @@ func _find_line_edit(root: Node) -> LineEdit:
 	return null
 
 
-func _find_all(root: Node, cls: String) -> Array[Control]:
+## Collects visible controls matching `pred` (a Callable taking a Node). Uses a
+## predicate because Object.is_class() only knows native classes, not class_name scripts.
+func _find_all(root: Node, pred: Callable) -> Array[Control]:
 	var out: Array[Control] = []
-	if root is Control and root.is_class(cls):
+	if root is Control and pred.call(root) and root.is_visible_in_tree():
 		out.append(root)
 	for c: Node in root.get_children():
-		out.append_array(_find_all(c, cls))
+		out.append_array(_find_all(c, pred))
 	return out
+
+
+static func _is_win98_button(n: Node) -> bool:
+	return n is Win98Button
+
+
+static func _is_base_button(n: Node) -> bool:
+	return n is BaseButton
 
 
 func _click(pos: Vector2) -> void:

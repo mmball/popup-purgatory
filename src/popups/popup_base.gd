@@ -10,7 +10,9 @@ signal trap_hit(popup: PopupBase, kind: String)
 var def: Dictionary
 var type_id := ""
 var ram_cost := 0           ## RAM this window currently occupies (may escalate)
-var age := 0.0
+var age := 0.0          ## seconds since spawn or last timeout
+var total_age := 0.0    ## seconds since spawn
+var spawned_near := false
 var lifetime := 0.0
 var timeouts := 0
 var is_closing := false
@@ -47,6 +49,7 @@ func _process(delta: float) -> void:
 	if is_closing:
 		return
 	age += delta
+	total_age += delta
 	if x_locked_until > 0.0 and age >= x_locked_until:
 		x_locked_until = 0.0
 		close_button.disabled = false

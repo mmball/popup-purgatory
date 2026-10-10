@@ -91,7 +91,7 @@ func update_from(run: RunState, imp_count: int, trained: int) -> void:
 	_bytes.text = "Bytes: %d" % run.bytes
 	_ram.text = "RAM: %d/%d" % [run.ram_used, run.ram_max]
 	if run.overloaded:
-		_ram.text = "RAM: LOW! %.1fs" % maxf(0.0, RunState.OVERLOAD_GRACE - run.overload_timer)
+		_ram.text = "RAM: LOW! %.1fs" % maxf(0.0, RunState.overload_grace() - run.overload_timer)
 		_ram.add_theme_color_override("font_color", Color("ff0000") if fmod(_blink, 0.4) < 0.2 else Win98.BLACK)
 	elif run.ram_fraction() > 0.8:
 		_ram.add_theme_color_override("font_color", Color("c00000"))

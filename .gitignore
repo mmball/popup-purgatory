@@ -18,3 +18,5 @@ tests.log
 smoke.log
 det_*.log
 runs/
+__pycache__/
+*.pyc

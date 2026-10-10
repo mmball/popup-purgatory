@@ -71,6 +71,7 @@ This turns hallucinated APIs and wrong types into parse errors instead of runtim
 
 ```
 src/core/      pure logic, RefCounted, no nodes, unit tested, no `Game` autoload access
+               (RunState, catalogs, SpawnSchedule, TargetAssigner, MetaSave, Tuning, Telemetry)
 src/ui/        reusable Win98 widgets (Win98, Win98Button, BevelPanel, WindowFrame, FloatText)
 src/popups/    PopupBase, PopupContent, PopupSpawner; content/<type>_content.gd per pop-up type
 src/imps/      Imp, ImpManager
@@ -81,7 +82,8 @@ src/dev/       dev-only tooling (Autoplay); must never be required at runtime
 src/autoload/  game.gd only ("Game" singleton: run, meta, screen flow, dev args)
 tests/         test_*.gd extending TestCase; run_tests.gd runner (JUnit via --junit=path)
 tests/screenshots/  committed PNG baselines (folder has .gdignore; never hand-edit)
-tools/         test.sh, lint.sh, botrun.sh, summarize_runs.py, screenshot.sh, screenshot_check.sh, compare_images.gd
+tools/         test.sh, lint.sh, botrun.sh, summarize_runs.py, balance.py, sweep.py, policy_driver.py,
+               screenshot.sh, screenshot_check.sh, compare_images.gd
 docs/          DESIGN.md (the design doc), img/ (curated screenshots)
 ```
 
@@ -134,6 +136,12 @@ tools/botrun.sh /path/to/godot 10 greedy 100 3   # 10 seeded runs -> runs/*.json
 - Bot batches are the feedback channel for gameplay changes. After touching catalogs,
   spawn pacing, imps or RAM: run a greedy and a random batch and read the per-wave table.
   Give the table to a reviewer (human or model), never the raw JSONL.
+- Balance work goes through `Tuning` first: try a `--tune` variant with `tools/sweep.py` on
+  identical seeds, read the table, and only then change the catalog constant (and the table
+  in `docs/DESIGN.md`) in the same commit. A number changed without a sweep in the commit
+  message is a regression waiting to be found by players.
+- Telemetry is append-only (`docs/TELEMETRY.md`): new events and fields are fine, renames
+  and repurposing are not; `tools/balance.py` and anything downstream read the names.
 - Dev-arg keys accept `-` or `_` (`--max-wave` and `--max_wave` are the same key).
 
 - Exit codes lie: Godot returns 0 with `SCRIPT ERROR` lines in stderr. `test.sh` greps the
@@ -143,7 +151,8 @@ tools/botrun.sh /path/to/godot 10 greedy 100 3   # 10 seeded runs -> runs/*.json
   Xvfb screenshot path and a look at the PNG.
 - Dev flags (after `--`): `--screen=`, `--demo=1`, `--autoplay=1`, `--policy=greedy|random`,
   `--runs=N`, `--jsonl=path`, `--max-wave=N`, `--max-seconds=S`, `--seed=N`,
-  `--ui=start|break`, `--noboot`, `--clock="12:00 AM"`, `--screenshot=path --delay=S --shots=N`.
+  `--ui=start|break`, `--noboot`, `--clock="12:00 AM"`, `--fresh-meta`, `--no-telemetry`,
+  `--telemetry-dir=path`, `--tune=k=v,...`, `--screenshot=path --delay=S --shots=N`.
 - Before claiming a visual change works, produce a screenshot and look at it. Before
   claiming a bug is fixed, reproduce it with a seed first.
 - Keep tasks small. One system per change. Run the loop before every commit.

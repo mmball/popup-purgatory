@@ -18,7 +18,10 @@ func _init(p_rng: RandomNumberGenerator = null) -> void:
 
 
 static func base_interval(wave: int) -> float:
-	return maxf(MIN_INTERVAL, FIRST_WAVE_INTERVAL - INTERVAL_STEP * (wave - 1))
+	var first := Tuning.num("spawn.first_interval", FIRST_WAVE_INTERVAL)
+	var step := Tuning.num("spawn.step", INTERVAL_STEP)
+	var floor_v := Tuning.num("spawn.min_interval", MIN_INTERVAL)
+	return maxf(floor_v, first - step * (wave - 1))
 
 
 ## Seconds until the next spawn. interval_mult > 1 slows the schedule down.
@@ -33,10 +36,10 @@ func pick_type(wave: int) -> String:
 	assert(ids.size() > 0, "No popup types available on wave %d" % wave)
 	var total := 0.0
 	for id: String in ids:
-		total += float(PopupCatalog.DEFS[id]["weight"])
+		total += PopupCatalog.weight(id)
 	var roll := rng.randf() * total
 	for id: String in ids:
-		roll -= float(PopupCatalog.DEFS[id]["weight"])
+		roll -= PopupCatalog.weight(id)
 		if roll <= 0.0:
 			return id
 	return ids[ids.size() - 1]

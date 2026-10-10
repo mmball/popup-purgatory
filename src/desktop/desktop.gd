@@ -16,9 +16,11 @@ var start_menu: StartMenu
 var break_dialog: BreakDialog
 var spawner: PopupSpawner
 var imp_manager: ImpManager
+var telemetry := Telemetry.new()
 
 var _ended := false
 var _confirm: ConfirmDialog
+var _overload_logged := false
 
 
 func _ready() -> void:
@@ -87,6 +89,8 @@ func _ready() -> void:
 	add_child(imp_manager)
 
 	run.crashed.connect(_on_crashed)
+	run.overload_changed.connect(_on_overload_changed)
+	_open_telemetry()
 	run.start_wave(1)
 	_place_starting_buildings()
 	if Game.dev.has("demo"):
@@ -97,6 +101,24 @@ func _ready() -> void:
 		"break":
 			_start_break()
 	_banner("WAVE 1", Color("ffd700"))
+
+
+func _open_telemetry() -> void:
+	if not Game.dev.has("no_telemetry"):
+		var dir := str(Game.dev.get("telemetry_dir", "user://telemetry"))
+		telemetry.open_sink("%s/%d_%d.jsonl" % [dir, Time.get_unix_time_from_system(), run.seed])
+	var perks: Array[String] = Game.meta.unlocks.duplicate()
+	_log("run_start", {"seed": run.seed, "policy": str(Game.dev.get("policy", "greedy")) if Game.dev.has("autoplay") else "human", "perks": perks, "tune": Tuning.spec})
+
+
+func _log(ev: String, fields: Dictionary = {}) -> void:
+	telemetry.event(ev, run.elapsed, run.wave, fields)
+
+
+func _on_overload_changed(active: bool, seconds_left: float) -> void:
+	if active != _overload_logged:
+		_overload_logged = active
+		_log("overload", {"active": active, "seconds_left": snappedf(seconds_left, 0.01)})
 
 
 func _place_starting_buildings() -> void:
@@ -139,6 +161,7 @@ func _wire_popup(popup: PopupBase) -> void:
 	popup.closed.connect(_on_popup_closed)
 	popup.timed_out.connect(_on_popup_timed_out)
 	popup.trap_hit.connect(_on_trap_hit)
+	_log("popup_spawned", {"type": popup.type_id, "ram_cost": popup.ram_cost, "clustered": popup.spawned_near, "ram_used": run.ram_used})
 
 
 func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
@@ -148,6 +171,7 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 	run.popup_closed(popup.ram_cost, completed, by_imp)
 	run.add_bytes(reward)
 	imp_manager.on_popup_closed(popup)
+	_log("popup_closed", {"type": popup.type_id, "completed": completed, "by_imp": by_imp, "age": snappedf(popup.total_age, 0.01), "reward": reward, "ram_used": run.ram_used})
 	var at := popup.global_position + Vector2(popup.size.x * 0.5, 10)
 	var col := Color("7CFC00") if completed else Color.WHITE
 	_float("+%d" % reward, at, col, 16 if completed else 13)
@@ -157,6 +181,7 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 func _on_popup_timed_out(popup: PopupBase) -> void:
 	var ot: Dictionary = popup.def.get("on_timeout", {"kind": "none"})
 	var near := popup.global_position + popup.size * 0.5
+	_log("popup_timeout", {"type": popup.type_id, "kind": str(ot.get("kind", "none")), "timeouts": popup.timeouts})
 	match str(ot.get("kind", "none")):
 		"multiply":
 			if run.timeouts_multiply:
@@ -177,6 +202,7 @@ func _on_popup_timed_out(popup: PopupBase) -> void:
 
 func _on_trap_hit(popup: PopupBase, kind: String) -> void:
 	var near := popup.global_position + popup.size * 0.5
+	_log("remind_later" if kind == "remind" else "trap", {"type": popup.type_id, "kind": kind})
 	match kind:
 		"trap":
 			for i in range(2):
@@ -209,8 +235,13 @@ func _on_trap_hit(popup: PopupBase, kind: String) -> void:
 
 func _start_break() -> void:
 	run.log_wave_end(imp_manager.imps.size(), imp_manager.count_trained())
+	_log("wave_end", run.wave_log[run.wave_log.size() - 1])
 	run.begin_break()
 	var choices := UpgradeCatalog.roll(rng, run, 3)
+	var offered: Array[String] = []
+	for c: Dictionary in choices:
+		offered.append(str(c["id"]))
+	_log("upgrade_offered", {"ids": offered})
 	break_dialog.show_choices(run.wave, choices)
 	break_dialog.center_in_parent()
 	village.cancel_place()
@@ -219,6 +250,7 @@ func _start_break() -> void:
 
 func _on_upgrade_chosen(id: String) -> void:
 	run.upgrades_picked.append(id)
+	_log("upgrade_picked", {"id": id})
 	var effect := UpgradeCatalog.apply(id, run)
 	match effect:
 		"spawn_imp":
@@ -273,6 +305,7 @@ func _build(id: String, cell: Vector2i, cost: int) -> void:
 	village.add_building(id, cell)
 	run.buildings_built += 1
 	run.buildings_list.append(id)
+	_log("build", {"id": id, "cell": [cell.x, cell.y], "cost": cost, "bytes_after": run.bytes, "owned_after": village.count(id)})
 	var at := village.cell_center(cell)
 	match id:
 		"hut":
@@ -329,6 +362,11 @@ func _end(reason: String) -> void:
 	_ended = true
 	set_process(false)
 	spawner.active = false
+	run.crash_reason = reason
+	var summary := run.summary()
+	summary.erase("waves")
+	_log("run_end", summary)
+	telemetry.close()
 	Game.call_deferred("end_run", reason)
 
 

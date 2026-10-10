@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# A new push on the same branch cancels the run in progress (a hung renderer
+# would otherwise sit there until GitHub's 6-hour limit).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   GODOT_VERSION: 4.7-stable
 
@@ -28,11 +34,13 @@ jobs:
         if: always()
         run: ./godot --headless --path . -s tests/run_tests.gd -- --junit=junit.xml >/dev/null 2>&1 || true
 
-      - name: Bot batch (greedy + random, 3 seeds each, 2 waves)
+      - name: Bot batches and balance tables (greedy, random, heuristic driver)
         run: |
-          tools/botrun.sh ./godot 3 greedy 100 2
-          tools/botrun.sh ./godot 3 random 200 2
+          tools/botrun.sh ./godot 5 greedy 100 3
+          tools/botrun.sh ./godot 5 random 200 3
+          python3 tools/policy_driver.py ./godot --backend heuristic --runs 5 --seed 300 --max-wave 3
           python3 tools/summarize_runs.py runs/*.jsonl | tee runs/summary.txt
+          python3 tools/balance.py runs/*.jsonl --events runs/telemetry --markdown | tee runs/balance.md
 
       - name: Upload logs and run data
         if: always()
@@ -63,11 +71,14 @@ jobs:
           sudo apt-get install -y -qq xvfb libgl1-mesa-dri libegl1 libxcursor1 libxinerama1 libxrandr2 libxi6 >/dev/null
 
       - name: Render fixed UI states and compare against tests/screenshots
+        timeout-minutes: 15
         run: tools/screenshot_check.sh ./godot
 
-      - name: Upload rendered screens and diffs
+      - name: Upload rendered screens, diffs and render logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: screenshots/*.png
+          path: |
+            screenshots/*.png
+            screenshots/*.log

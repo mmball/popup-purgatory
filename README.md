@@ -51,8 +51,12 @@ tests/                      headless unit tests + runner
 tests/screenshots/          committed baselines for screenshot regression
 tools/lint.sh               bans Godot 3 APIs, Python idioms, global RNG in gameplay
 tools/test.sh               lint + import + tests + bot smoke run + determinism check (what CI runs)
-tools/botrun.sh             batch of seeded bot runs -> runs/*.jsonl -> summary table
+tools/botrun.sh             batch of seeded bot runs -> runs/*.jsonl + runs/telemetry/ -> summary table
 tools/summarize_runs.py     aggregates run JSONL into per-policy and per-wave tables
+tools/balance.py            survival by wave, pick rates with conditional outcomes, pop-up type table, crashes
+tools/sweep.py              Monte Carlo parameter sweep: same seeds under several --tune variants
+tools/policy_driver.py      plays the game through an external policy: a Python heuristic or Claude
+docs/TELEMETRY.md           the event and run-row schema
 tools/screenshot.sh         render the fixed UI states under Xvfb (frozen clock, fixed fps)
 tools/screenshot_check.sh   render + compare against tests/screenshots (2% pixel tolerance)
 tools/compare_images.gd     the pixel comparer, pure GDScript, no dependencies
@@ -87,7 +91,32 @@ python3 tools/summarize_runs.py runs/*.jsonl       # per-policy, per-wave, pick-
 ```
 
 Headless runs are fast (roughly 4,000 frames per second here), so a 20-run batch takes
-seconds. This is the input for balancing in roadmap phase 4.
+seconds.
+
+**Telemetry.** Every run, bot or human, writes an event log (`user://telemetry/<unix>_<seed>.jsonl`,
+or `--telemetry-dir=`): spawns, closes with age and reward, timeouts, traps, builds, upgrade
+offers and picks, overloads, and the run end. Schema in `docs/TELEMETRY.md`.
+
+**Balancing.** Three tools turn those rows into tables, so decisions are made from aggregates
+rather than raw logs:
+
+```sh
+python3 tools/balance.py runs/*.jsonl --events runs/telemetry   # survival, pick rates, pop-up types, crashes
+python3 tools/sweep.py /path/to/godot --runs 20 --max-wave 4 base run.base_ram=120 "building.hut.cost=15"
+python3 tools/policy_driver.py /path/to/godot --backend heuristic --runs 10 --max-wave 4
+```
+
+`--tune=key=value,...` overrides any balance number at launch (RAM, grace, spawn pacing, per
+pop-up costs and rewards, building costs and caps; full key list in `src/core/tuning.gd`), which
+is what `sweep.py` uses to compare variants on identical seeds.
+
+**LLM player.** `tools/policy_driver.py --backend claude` lets Claude play: the bot writes the
+state and the legal moves to a file about once per game second, the driver asks the model for one
+move id (structured JSON output) and writes it back, and the game waits meanwhile. Needs
+`pip install anthropic` and credentials. Each decision is one request, so a three-wave run is
+roughly 100 to 150 requests; the decision log with the model's one-line reasons lands in
+`runs/policy/decisions.jsonl`. The `heuristic` backend is the same protocol with a Python policy
+and runs for free.
 
 **Screenshot regression.** Five fixed UI states (menu, desktop with the demo layout, Start
 menu, wave break, BSOD) render deterministically under a frozen clock and fixed frame rate.
@@ -106,6 +135,9 @@ Command-line dev options go after `--`:
 | `--runs=N --jsonl=path` | the bot chains N runs (seed, seed+1, ...) and appends one JSON line per run |
 | `--max-wave=N`, `--max-seconds=S` | end a run early (bot batches) |
 | `--clock="12:00 AM"` | freeze the taskbar clock (screenshot regression) |
+| `--tune=k=v,k=v` | override balance numbers for this process |
+| `--telemetry-dir=path`, `--no-telemetry` | where event logs go, or skip them |
+| `--policy=external --policy-dir=DIR --decision-interval=S` | hand decisions to `tools/policy_driver.py` |
 | `--seed=N` | deterministic run (spawns, upgrades, captcha words, imp wandering) |
 | `--ui=start\|break` | open the Start menu or the wave-break dialog immediately |
 | `--noboot` | skip the boot text on the menu |

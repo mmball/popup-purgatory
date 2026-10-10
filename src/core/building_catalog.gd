@@ -68,8 +68,10 @@ static func get_def(id: String) -> Dictionary:
 
 
 static func cost(id: String, owned: int) -> int:
-	return int(round(float(DEFS[id]["cost"]) * (1.0 + COST_GROWTH * owned)))
+	var base := Tuning.num("building.%s.cost" % id, float(DEFS[id]["cost"]))
+	var growth := Tuning.num("building.cost_growth", COST_GROWTH)
+	return int(round(base * (1.0 + growth * owned)))
 
 
 static func max_count(id: String) -> int:
-	return int(DEFS[id]["max"])
+	return Tuning.inum("building.%s.max" % id, int(DEFS[id]["max"]))

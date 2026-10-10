@@ -58,7 +58,7 @@ static func apply(id: String, run: RunState) -> String:
 			run.close_button_size += 8
 			return "resize_x"
 		"more_ram":
-			run.set_ram_max(run.ram_max + 24)
+			run.set_ram_max(run.ram_max + Tuning.inum("upgrade.more_ram.amount", 24))
 		"fast_imps":
 			run.imp_speed_mult *= 1.25
 		"quick_hands":
