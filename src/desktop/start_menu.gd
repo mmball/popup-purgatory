@@ -101,12 +101,13 @@ func refresh(run: RunState, village: Village) -> void:
 		var id: String = ids[i]
 		var owned := village.count(id)
 		var maxed := owned >= BuildingCatalog.max_count(id)
+		var cost := BuildingCatalog.cost(id, owned, run.building_cost_mult)
 		var item: MenuItem = _items[i]
 		if maxed:
 			item.detail = "MAX (%d)" % owned
 		else:
-			item.detail = "%d B   x%d" % [BuildingCatalog.cost(id, owned, run.building_cost_mult), owned]
-		item.disabled = maxed
+			item.detail = "%d B   x%d" % [cost, owned]
+		item.disabled = maxed or run.bytes < cost
 		item.queue_redraw()
 
 

@@ -11,8 +11,10 @@ func _ready() -> void:
 	if dev.has("no_juice"):
 		Juice.enabled = false
 		Sfx.enabled = false
-	if DisplayServer.get_name() == "headless":
-		Sfx.enabled = false  # no listener, and the dummy driver leaks playbacks at exit
+	if DisplayServer.get_name() == "headless" or dev.has("no_sound"):
+		# No listener headless; and with --audio-driver Dummy (CI renders) the
+		# driver leaks playbacks at exit, so renders pass --no-sound.
+		Sfx.enabled = false
 	Sfx.attach(self)
 	match str(dev.get("screen", "menu")):
 		"desktop":
@@ -31,6 +33,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	Sfx.release()
+	Win98.release()
 
 
 func show_screen(id: String) -> void:

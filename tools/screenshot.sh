@@ -17,7 +17,7 @@ run() {
   local name="$1"; shift
   local log="$OUT/$name.log"
   if ! LIBGL_ALWAYS_SOFTWARE=1 timeout 120 xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
-      --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 -- --clock="12:00 AM" --noboot --fresh-meta --no-telemetry "$@" >"$log" 2>&1; then
+      --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 -- --clock="12:00 AM" --noboot --fresh-meta --no-telemetry --no-sound "$@" >"$log" 2>&1; then
     echo "render failed or timed out: $name (see $log)"; tail -20 "$log"; return 1
   fi
   grep -E "^screenshot|SCRIPT ERROR" "$log" || true

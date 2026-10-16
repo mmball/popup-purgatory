@@ -132,6 +132,12 @@ func _draw() -> void:
 	for y in range(ROWS + 1):
 		var py := ORIGIN.y + y * CELL
 		draw_line(Vector2(ORIGIN.x, py), Vector2(ORIGIN.x + COLS * CELL, py), grid_col, 1.0)
+	var pdef := BuildingCatalog.get_def(placing_id)
+	var hint := "Placing %s: click a free cell.  Esc or right-click cancels." % str(pdef["name"])
+	var hs := Win98.text_size(hint, 13)
+	var hx := (size.x - hs.x) * 0.5
+	draw_rect(Rect2(hx - 8, 8, hs.x + 16, hs.y + 8), Color(0, 0, 0, 0.55))
+	Win98.draw_text(self, Vector2(hx, 12), hint, Color.WHITE, 13)
 	if in_bounds(_hover_cell):
 		var ok := cell_free(_hover_cell) and _can_afford
 		var col := Color(0.3, 1.0, 0.3, 0.35) if ok else Color(1.0, 0.3, 0.3, 0.35)

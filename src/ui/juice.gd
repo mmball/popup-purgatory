@@ -27,13 +27,24 @@ static func pop_out(c: Control, done: Callable, duration: float = 0.14) -> void:
 		done.call()
 		return
 	c.pivot_offset = c.size * 0.5
-	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ignore_input(c)
 	var tw := c.create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(c, "scale:y", 0.05, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(c, "scale:x", 1.08, duration * 0.5)
 	tw.tween_property(c, "modulate:a", 0.0, duration).set_delay(duration * 0.4)
 	tw.chain().tween_callback(done)
+
+
+## Makes a control and every control under it ignore the mouse (folding windows
+## must not take a click that would spawn or reward anything).
+static func _ignore_input(n: Node) -> void:
+	if n is Control:
+		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if n is BaseButton:
+			n.disabled = true
+	for child: Node in n.get_children():
+		_ignore_input(child)
 
 
 ## Brief colour flash on a canvas item (title bar on raise, red on penalties).

@@ -108,6 +108,8 @@ func _ready() -> void:
 			_toggle_start_menu()
 		"break":
 			_start_break()
+		"place":
+			_begin_place("hut")
 	_banner("HOUR 1", Color("ffd700"))
 
 
@@ -211,7 +213,10 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 	_log("popup_closed", {"type": popup.type_id, "completed": completed, "by_imp": by_imp, "age": snappedf(popup.total_age, 0.01), "reward": reward, "ram_used": run.ram_used})
 	var at := popup.global_position + Vector2(popup.size.x * 0.5, 10)
 	var col := Color("7CFC00") if completed else Color.WHITE
-	_float("+%d" % reward, at, col, clampi(12 + reward * 2, 13, 30))
+	if reward > 0:
+		_float("+%d" % reward, at, col, clampi(12 + reward * 2, 13, 30))
+	else:
+		_float("leak stopped" if popup.def.has("leak") else "closed", at, Color("c0c0c0"), 12)
 	if completed:
 		Sfx.play("chime_big" if reward >= 8 else "chime", 1.0 + minf(reward, 10) * 0.02)
 	else:
@@ -283,7 +288,7 @@ func _on_trap_hit(popup: PopupBase, kind: String) -> void:
 			run.popup_closed(popup.ram_cost, false, false)
 			imp_manager.on_popup_closed(popup)
 			popup.is_closing = true
-			popup.queue_free()
+			Juice.pop_out(popup, popup.queue_free)
 			spawner.queue("update", 8.0, near)
 			_float("later...", near, Color.WHITE, 12)
 		"subscribed":
@@ -355,7 +360,7 @@ func _start_break() -> void:
 	run.begin_break()
 	var earned := run.score - _wave_score_start
 	_wave_score_start = run.score
-	_float("Hour %d done: +%d bytes" % [run.wave, earned], Vector2(640, 240), Color("ffd700"), 22)
+	_float("Hour %d done: +%d bytes" % [run.wave, earned], Vector2(640, 190), Color("ffd700"), 22)
 	Sfx.play("chime_big", 0.9, 0.0, 0.0)
 	var choices := UpgradeCatalog.roll(rng, run, 3)
 	var offered: Array[String] = []
@@ -403,7 +408,22 @@ func _begin_place(id: String) -> void:
 	if village.count(id) >= BuildingCatalog.max_count(id):
 		_float("maxed out", Vector2(640, 300), Color("ff6060"), 14)
 		return
-	village.begin_place(id, run.bytes >= building_cost(id, village.count(id)))
+	var cost := building_cost(id, village.count(id))
+	if run.bytes < cost:
+		_need_bytes(cost, Vector2(640, 300))
+		return
+	village.begin_place(id, true)
+
+
+var _last_need_float := -10.0
+
+
+## "need N bytes", at most once per second so a held click cannot spam it.
+func _need_bytes(cost: int, at: Vector2) -> void:
+	if run.elapsed - _last_need_float < 1.0:
+		return
+	_last_need_float = run.elapsed
+	_float("need %d bytes" % cost, at, Color("ff6060"), 12)
 
 
 func building_cost(id: String, owned: int) -> int:
@@ -417,7 +437,7 @@ func _on_place_requested(id: String, cell: Vector2i) -> void:
 		village.cancel_place()
 		return
 	if not run.spend(cost):
-		_float("need %d bytes" % cost, village.cell_center(cell), Color("ff6060"), 12)
+		_need_bytes(cost, village.cell_center(cell))
 		return
 	_build(id, cell, cost)
 	# stay in placement mode while another copy is possible and affordable

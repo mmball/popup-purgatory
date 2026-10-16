@@ -116,6 +116,8 @@ func _close(completed: bool, by_imp: bool) -> void:
 	if is_closing:
 		return
 	is_closing = true
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	close_button.disabled = true
 	closed.emit(self, completed, by_imp)
 
 

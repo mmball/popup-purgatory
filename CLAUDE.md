@@ -162,7 +162,8 @@ tools/botrun.sh /path/to/godot 10 greedy 100 3   # 10 seeded runs -> runs/*.json
 - Dev flags (after `--`): `--screen=`, `--demo=1`, `--autoplay=1`, `--policy=greedy|random`,
   `--runs=N`, `--jsonl=path`, `--max-wave=N`, `--max-seconds=S`, `--seed=N`,
   `--ui=start|break`, `--noboot`, `--clock="12:00 AM"`, `--fresh-meta`, `--no-telemetry`,
-  `--telemetry-dir=path`, `--tune=k=v,...`, `--no-juice`, `--screenshot=path --delay=S --shots=N`.
+  `--telemetry-dir=path`, `--tune=k=v,...`, `--no-juice`, `--no-sound`, `--bsod-linger=S`,
+  `--ui=start|break|place|unlocks`, `--screenshot=path --delay=S --shots=N`.
 - Before claiming a visual change works, produce a screenshot and look at it. Before
   claiming a bug is fixed, reproduce it with a seed first.
 - Keep tasks small. One system per change. Run the loop before every commit.

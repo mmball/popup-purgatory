@@ -62,6 +62,13 @@ static func title_gradient(active: bool = true) -> GradientTexture2D:
 	return _inactive_gradient
 
 
+## Drops the cached textures (Main calls this on exit so the engine does not
+## report resources still in use).
+static func release() -> void:
+	_title_gradient = null
+	_inactive_gradient = null
+
+
 static func _make_gradient(a: Color, b: Color) -> GradientTexture2D:
 	var g := Gradient.new()
 	g.set_color(0, a)
