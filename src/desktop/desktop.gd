@@ -311,8 +311,8 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 		Sfx.play("chime_big" if reward >= 8 else "chime", 1.0 + minf(reward, 10) * 0.02 + (0.05 * mini(run.streak, RunState.STREAK_CAP) if not by_imp else 0.0))
 	else:
 		Sfx.play("click", 1.0 if not by_imp else 1.25)
-	if not completed and popup.dismiss_spawns() > 0:
-		# Consent fatigue: X-ing a cookie banner brings two more.
+	if not completed and popup.dismiss_spawns() > 0 and not popup.killed:
+		# Consent fatigue: X-ing a cookie banner brings two more (End Task kills the process instead).
 		var spawn_type := str(popup.def["on_dismiss"].get("type", popup.type_id))
 		for i in range(popup.dismiss_spawns()):
 			spawner.spawn(spawn_type, popup.global_position + popup.size * 0.5)
@@ -901,6 +901,7 @@ func _open_task_manager() -> void:
 	task_manager.drag_bounds = Rect2(Vector2.ZERO, Vector2(1280, DESKTOP_H))
 	task_manager.end_task_requested.connect(func(p: PopupBase) -> void:
 		_log("task_ended", {"type": p.type_id, "ends_left": task_manager.ends_left if task_manager != null else 0})
+		p.killed = true
 		p.dismiss(false))
 	task_manager.close_requested.connect(_close_task_manager)
 	add_child(task_manager)

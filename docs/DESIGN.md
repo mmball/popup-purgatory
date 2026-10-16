@@ -184,7 +184,7 @@ taskbar tray with its cooldown drawn as a rising sweep:
 | ability | chord | cooldown | effect |
 | --- | --- | --- | --- |
 | Alt+F4 | Alt+F4 | none | dismisses the front window (a keyboard X; refuses a locked X) |
-| Task Manager | Ctrl+Shift+Esc | 45 s | a Win98 Task Manager lists open pop-ups, biggest RAM first; End Task closes the selected one instantly (locked or not) for its dismiss reward, 3 times per use (5 with Admin Rights); imps keep working |
+| Task Manager | Ctrl+Shift+Esc | 45 s | a Win98 Task Manager lists open pop-ups, biggest RAM first; End Task closes the selected one instantly (locked or not) for its dismiss reward, 3 times per use (5 with Admin Rights); a kill, so a cookie banner spawns nothing; imps keep working |
 | Ctrl+Alt+Del | Ctrl+Alt+Del, held | once per hour | the desk freezes while held: no spawns, no ageing, no RAM growth, no clock; the screen dims and a bar fills; hold past 5 s and the machine resets (BSOD, reason RESET) |
 
 Alt+F4 and End Task are manual dismisses, so they reset a streak like any X. Nothing

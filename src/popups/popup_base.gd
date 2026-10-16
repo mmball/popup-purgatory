@@ -23,6 +23,7 @@ var content_node: PopupContent
 var rng: RandomNumberGenerator
 var run: RunState
 var imp_cooldown := 0.0   ## seconds imps ignore this window after it hopped
+var killed := false       ## closed by Task Manager's End Task: a process kill, so no consent fatigue
 var _leak_timer := 0.0
 
 
