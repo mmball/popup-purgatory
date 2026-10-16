@@ -24,7 +24,8 @@ building directly, **Esc** cancels placement, right-click also cancels. Drag win
 their title bar.
 
 The full design is in [`docs/DESIGN.md`](docs/DESIGN.md); the plan to a published game is
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+[`docs/ROADMAP.md`](docs/ROADMAP.md); the next gameplay features, each with a verdict and an
+implementation note, are in [`docs/FEATURES.md`](docs/FEATURES.md).
 
 ## Layout
 
