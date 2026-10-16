@@ -28,6 +28,9 @@ var _wander_timer := 0.0
 var _retarget_timer := 0.0
 var _work_left := 0.0
 var _work_total := 1.0
+var hop_y := 0.0          ## animated by Juice.hop; added to the drawing offset
+var _alert_t := 0.0       ## seconds left to draw the "!" after acquiring a target
+var _sulk_t := 0.0        ## seconds left to draw the frown after being dodged
 
 
 func _ready() -> void:
@@ -43,6 +46,8 @@ func speed() -> float:
 
 func _process(delta: float) -> void:
 	_t += delta
+	_alert_t = maxf(0.0, _alert_t - delta)
+	_sulk_t = maxf(0.0, _sulk_t - delta)
 	match state:
 		State.IDLE:
 			_idle(delta)
@@ -61,6 +66,7 @@ func _idle(delta: float) -> void:
 		if t != null:
 			target = t
 			state = State.SEEK
+			_alert_t = 0.6
 			return
 	_wander_timer -= delta
 	if _wander_timer <= 0.0:
@@ -91,9 +97,11 @@ func _seek(delta: float) -> void:
 			var parent := target.get_parent()
 			var bounds := Rect2(Vector2.ZERO, parent.size) if parent is Control else Rect2(0, 0, 1280, 690)
 			target.hop(bounds)
+			_sulk_t = 1.2
 			_drop_target()
 			return
 		state = State.WORK
+		Juice.squash(self)
 		var will_complete := trained
 		_work_total = (target.imp_complete_time() if will_complete else Tuning.num("imp.dismiss_time", DISMISS_TIME))
 		_work_total *= run.imp_work_mult if run != null else 1.0
@@ -111,6 +119,7 @@ func _work(delta: float) -> void:
 		target = null
 		state = State.IDLE
 		manager.release(self)
+		Juice.hop(self)
 		if trained:
 			t.complete(true)
 		else:
@@ -131,7 +140,7 @@ func _move_toward(dest: Vector2, px_per_s: float, delta: float) -> float:
 
 func _draw() -> void:
 	var walking := state != State.WORK
-	var bob := sin(_t * 10.0) * (1.5 if walking else 0.5)
+	var bob := sin(_t * 10.0) * (1.5 if walking else 0.5) + hop_y
 	var c := body_color
 	# feet
 	draw_circle(Vector2(-4, 1), 2.5, c.darkened(0.4))
@@ -149,8 +158,15 @@ func _draw() -> void:
 	draw_circle(bc + Vector2(3, -1) + eo, 2.2, Color.WHITE)
 	draw_circle(bc + Vector2(-3, -1) + eo * 1.8, 1.0, Color.BLACK)
 	draw_circle(bc + Vector2(3, -1) + eo * 1.8, 1.0, Color.BLACK)
-	# grin
-	draw_arc(bc + Vector2(0, 2), 3.5, 0.2, PI - 0.2, 8, Color.BLACK, 1.0)
+	# grin, or a frown while sulking after a dodge
+	if _sulk_t > 0.0:
+		draw_arc(bc + Vector2(0, 5), 3.5, PI + 0.2, TAU - 0.2, 8, Color.BLACK, 1.0)
+	else:
+		draw_arc(bc + Vector2(0, 2), 3.5, 0.2, PI - 0.2, 8, Color.BLACK, 1.0)
+	if _alert_t > 0.0:
+		var ay := bc.y - 22 - (0.6 - _alert_t) * 6.0
+		draw_rect(Rect2(-1.5, ay, 3, 7), Color("ffd700"))
+		draw_rect(Rect2(-1.5, ay + 9, 3, 3), Color("ffd700"))
 	if trained:
 		# mortarboard
 		draw_rect(Rect2(bc + Vector2(-7, -15), Vector2(14, 3)), Color("222222"))

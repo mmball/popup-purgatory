@@ -63,6 +63,7 @@ func _process(delta: float) -> void:
 	if lifetime > 0.0 and age >= lifetime:
 		age = 0.0
 		timeouts += 1
+		Juice.flash(self, Color(1.5, 0.6, 0.6), 0.4)
 		timed_out.emit(self)
 	if imp_cooldown > 0.0:
 		imp_cooldown -= delta
@@ -98,6 +99,8 @@ func hop(bounds: Rect2) -> void:
 			p = q
 	position = p.round()
 	imp_cooldown = 8.0
+	Juice.pop_in(self, 0.12)
+	Sfx.play("hop", 1.3)
 	hopped.emit(self)
 
 

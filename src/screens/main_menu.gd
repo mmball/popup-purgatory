@@ -29,6 +29,8 @@ func _ready() -> void:
 	if Game.dev.has("noboot") or Game.dev.has("screenshot"):
 		_boot = false
 		_build_desktop()
+	else:
+		Sfx.play("dialup", 1.0, 0.0, 0.0)
 
 
 func _process(delta: float) -> void:

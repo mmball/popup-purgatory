@@ -170,7 +170,7 @@ def serve(godot, backend, runs, seed, max_wave, decision_interval, log_path, unl
     args = [godot, "--headless", "--fixed-fps", "60", "--path", ".", "--quit-after", str(runs * max_wave * 60 * 120),
             "--", "--screen=desktop", "--autoplay=1", "--policy=external", f"--policy-dir={POLICY_DIR}",
             f"--decision-interval={decision_interval}", f"--runs={runs}", f"--seed={seed}",
-            f"--max-wave={max_wave}", f"--jsonl={out}", "--fresh-meta"] + (["--unlock-all=1"] if unlock_all else [])
+            f"--max-wave={max_wave}", f"--jsonl={out}", "--fresh-meta", "--no-juice"] + (["--unlock-all=1"] if unlock_all else [])
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     log = open(log_path, "a")
     seq = 0

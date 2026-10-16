@@ -138,6 +138,19 @@ Saved to `user://meta.json`.
 RAM over the limit for 3 seconds. The taskbar RAM readout blinks red with the countdown.
 The BSOD lists wave, bytes, closes by you vs imps, imps hired, buildings built, time.
 
+## Feel
+
+Every state change has a visual and a sound; none of it touches game state (`Juice`,
+`Sfx`, both off under `--no-juice`). Windows scale-bounce in and fold away; raising one
+flashes its title bar; multiplication, leaks and traps flash red and add screen shake
+(trauma squared, fast decay). Imps squash on landing, hop when they finish, show a "!"
+when they pick a target and sulk when a chat widget dodges them. RAM past 75% darkens the
+wallpaper and plays a rising tone that quickens with the fill; overload adds a warning
+blip and shake. The crash is half a second of static and shake, then the BSOD types itself
+out. Sounds: click per dismiss, chime per completion (bigger for bigger rewards), the
+three-note error chord on traps, a two-tone multiply, a hop, the 5 PM fanfare, the
+shutdown chord on clock-out, a dial-up on boot. All synthesised in `tools/make_audio.py`.
+
 ## Balance notes (untested guesses)
 
 - Wave 1 spawns ~14 pop-ups; a player who completes half earns ~30 bytes: one hut, maybe

@@ -120,7 +120,12 @@ func _on_close_pressed() -> void:
 
 func raise() -> void:
 	move_to_front()
+	Juice.flash(title_bar, Color(1.6, 1.6, 1.6))
 	raised.emit()
+
+
+func _ready() -> void:
+	Juice.pop_in(self)
 
 
 func _gui_input(event: InputEvent) -> void:

@@ -22,6 +22,11 @@ var _ended := false
 var _confirm: ConfirmDialog
 var _overload_logged := false
 var _clockout: ConfirmDialog
+var trauma := 0.0           ## screen shake, decays each frame (Juice.add_trauma)
+var _wall: ColorRect
+var _rise_timer := 0.0
+var _wave_score_start := 0
+var _shake_rng := RandomNumberGenerator.new()  # cosmetic only; seeded so screenshots are stable
 
 
 func _ready() -> void:
@@ -36,6 +41,8 @@ func _ready() -> void:
 	wall.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	wall.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(wall)
+	_wall = wall
+	_shake_rng.seed = 98
 
 	village = Village.new()
 	village.size = Vector2(1280, DESKTOP_H)
@@ -101,7 +108,26 @@ func _ready() -> void:
 			_toggle_start_menu()
 		"break":
 			_start_break()
-	_banner("WAVE 1", Color("ffd700"))
+	_banner("HOUR 1", Color("ffd700"))
+
+
+## Per-frame cosmetics: shake decay, overload darkening, the rising RAM tone.
+func _feel(delta: float) -> void:
+	if not Juice.enabled:
+		return
+	if trauma > 0.0:
+		trauma = maxf(0.0, trauma - delta * 1.6)
+		position = Juice.shake_offset(trauma, 14.0, _shake_rng)
+	elif position != Vector2.ZERO:
+		position = Vector2.ZERO
+	var fill := run.ram_fraction()
+	var dark := clampf((fill - 0.7) / 0.3, 0.0, 1.0) * 0.45
+	_wall.color = Win98.DESKTOP.darkened(dark)
+	if fill > 0.75 and not run.in_break:
+		_rise_timer -= delta
+		if _rise_timer <= 0.0:
+			_rise_timer = lerpf(1.2, 0.35, clampf((fill - 0.75) / 0.35, 0.0, 1.0))
+			Sfx.play("rise", lerpf(0.8, 1.6, clampf((fill - 0.75) / 0.35, 0.0, 1.0)), -4.0, 0.0)
 
 
 func _open_telemetry() -> void:
@@ -120,6 +146,9 @@ func _on_overload_changed(active: bool, seconds_left: float) -> void:
 	if active != _overload_logged:
 		_overload_logged = active
 		_log("overload", {"active": active, "seconds_left": snappedf(seconds_left, 0.01)})
+		if active:
+			Sfx.play("warn", 1.0, 0.0, 0.0)
+			Juice.add_trauma(self, 0.3)
 
 
 func _place_starting_buildings() -> void:
@@ -144,6 +173,7 @@ func _process(delta: float) -> void:
 	if _ended:
 		return
 	run.tick(delta)
+	_feel(delta)
 	if run.workday_over():
 		_workday_end()
 	elif run.wave_finished():
@@ -181,7 +211,11 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 	_log("popup_closed", {"type": popup.type_id, "completed": completed, "by_imp": by_imp, "age": snappedf(popup.total_age, 0.01), "reward": reward, "ram_used": run.ram_used})
 	var at := popup.global_position + Vector2(popup.size.x * 0.5, 10)
 	var col := Color("7CFC00") if completed else Color.WHITE
-	_float("+%d" % reward, at, col, 16 if completed else 13)
+	_float("+%d" % reward, at, col, clampi(12 + reward * 2, 13, 30))
+	if completed:
+		Sfx.play("chime_big" if reward >= 8 else "chime", 1.0 + minf(reward, 10) * 0.02)
+	else:
+		Sfx.play("click", 1.0 if not by_imp else 1.25)
 	if not completed and popup.dismiss_spawns() > 0:
 		# Consent fatigue: X-ing a cookie banner brings two more.
 		var spawn_type := str(popup.def["on_dismiss"].get("type", popup.type_id))
@@ -189,13 +223,16 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 			spawner.spawn(spawn_type, popup.global_position + popup.size * 0.5)
 		_log("dismiss_penalty", {"type": popup.type_id, "count": popup.dismiss_spawns()})
 		_float("consent fatigue", at + Vector2(0, 20), Color("ff6060"), 12)
-	popup.queue_free()
+		Sfx.play("multiply", 0.8)
+	Juice.pop_out(popup, popup.queue_free)
 
 
 func _on_popup_leaked(popup: PopupBase, grow: int) -> void:
 	var extra := maxi(1, int(round(grow * run.leak_growth_mult)))
 	popup.ram_cost += extra
 	run.add_ram_cost(extra)
+	Juice.flash(popup, Color(1.5, 0.6, 0.6), 0.4)
+	Sfx.play("multiply", 0.6, -6.0)
 	_log("leak_grow", {"type": popup.type_id, "grow": extra, "ram_cost": popup.ram_cost})
 	_float("+%d RAM" % extra, popup.global_position + Vector2(popup.size.x * 0.5, 10), Color("ff6060"), 12)
 
@@ -204,6 +241,9 @@ func _on_popup_timed_out(popup: PopupBase) -> void:
 	var ot: Dictionary = popup.def.get("on_timeout", {"kind": "none"})
 	var near := popup.global_position + popup.size * 0.5
 	_log("popup_timeout", {"type": popup.type_id, "kind": str(ot.get("kind", "none")), "timeouts": popup.timeouts})
+	if str(ot.get("kind", "none")) != "none":
+		Sfx.play("multiply")
+		Juice.add_trauma(self, 0.18)
 	match str(ot.get("kind", "none")):
 		"multiply":
 			if run.timeouts_multiply:
@@ -225,6 +265,10 @@ func _on_popup_timed_out(popup: PopupBase) -> void:
 func _on_trap_hit(popup: PopupBase, kind: String) -> void:
 	var near := popup.global_position + popup.size * 0.5
 	_log("remind_later" if kind == "remind" else "trap", {"type": popup.type_id, "kind": kind})
+	if kind != "remind":
+		Sfx.play("error")
+		Juice.flash(popup, Color(1.5, 0.6, 0.6), 0.4)
+		Juice.add_trauma(self, 0.25)
 	match kind:
 		"trap":
 			for i in range(2):
@@ -268,6 +312,7 @@ func _workday_end() -> void:
 	run.begin_break()
 	run.clock_out()
 	_log("clock_out", {"score": run.score, "tier": run.tier})
+	Sfx.play("fanfare", 1.0, 2.0, 0.0)
 	village.cancel_place()
 	start_menu.visible = false
 	_banner("5:00 PM", Color("ffd700"))
@@ -308,6 +353,10 @@ func _start_break() -> void:
 	run.log_wave_end(imp_manager.imps.size(), imp_manager.count_trained())
 	_log("wave_end", run.wave_log[run.wave_log.size() - 1])
 	run.begin_break()
+	var earned := run.score - _wave_score_start
+	_wave_score_start = run.score
+	_float("Hour %d done: +%d bytes" % [run.wave, earned], Vector2(640, 240), Color("ffd700"), 22)
+	Sfx.play("chime_big", 0.9, 0.0, 0.0)
 	var choices := UpgradeCatalog.roll(rng, run, 3)
 	var offered: Array[String] = []
 	for c: Dictionary in choices:
@@ -332,7 +381,7 @@ func _on_upgrade_chosen(id: String) -> void:
 					p.set_close_button_size(run.close_button_size)
 	break_dialog.visible = false
 	run.end_break()
-	_banner("WAVE %d" % run.wave, Color("ffd700"))
+	_banner("HOUR %d" % run.wave, Color("ffd700"))
 
 
 # ---------- building ----------
@@ -406,6 +455,7 @@ func _build(id: String, cell: Vector2i, cost: int) -> void:
 			spawner.screensaver = true
 	if cost > 0:
 		_float("-%d" % cost, at, Color("ffd700"), 13)
+		Sfx.play("chime", 0.7)
 
 
 func _on_icon_activated(kind: String) -> void:
@@ -435,6 +485,32 @@ func _ask_shutdown() -> void:
 
 
 func _on_crashed(reason: String) -> void:
+	if Juice.enabled and not _ended:
+		# Half a second of static and a big shake, then the BSOD.
+		_ended = true
+		set_process(false)
+		spawner.active = false
+		Sfx.play("crash", 1.0, 4.0, 0.0)
+		var static_layer := Control.new()
+		static_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		static_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+		var srng := RandomNumberGenerator.new()
+		srng.seed = 1998
+		static_layer.draw.connect(func() -> void:
+			for i in range(900):
+				var p := Vector2(srng.randf() * 1280.0, srng.randf() * 720.0)
+				static_layer.draw_rect(Rect2(p, Vector2(srng.randf_range(2, 40), srng.randf_range(1, 3))), Color(srng.randf(), srng.randf(), srng.randf(), 0.8)))
+		add_child(static_layer)
+		var tw := create_tween()
+		tw.tween_interval(0.08)
+		for i in range(5):
+			tw.tween_callback(static_layer.queue_redraw)
+			tw.tween_callback(func() -> void: position = Juice.shake_offset(1.0, 18.0, _shake_rng))
+			tw.tween_interval(0.08)
+		tw.tween_callback(func() -> void:
+			_ended = false
+			_end(reason))
+		return
 	_end(reason)
 
 

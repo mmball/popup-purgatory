@@ -8,6 +8,12 @@ func _ready() -> void:
 	theme = Win98.build_theme()
 	Game.screen_requested.connect(show_screen)
 	var dev: Dictionary = Game.dev
+	if dev.has("no_juice"):
+		Juice.enabled = false
+		Sfx.enabled = false
+	if DisplayServer.get_name() == "headless":
+		Sfx.enabled = false  # no listener, and the dummy driver leaks playbacks at exit
+	Sfx.attach(self)
 	match str(dev.get("screen", "menu")):
 		"desktop":
 			Game.start_run()
@@ -23,6 +29,10 @@ func _ready() -> void:
 		_schedule_screenshots(str(dev["screenshot"]), float(dev.get("delay", "2.0")), int(dev.get("shots", "1")))
 
 
+func _exit_tree() -> void:
+	Sfx.release()
+
+
 func show_screen(id: String) -> void:
 	if current != null:
 		current.queue_free()
@@ -30,10 +40,13 @@ func show_screen(id: String) -> void:
 	match id:
 		"menu":
 			current = MainMenu.new()
+			Sfx.music("menu")
 		"desktop":
 			current = Desktop.new()
+			Sfx.music("desk")
 		"bsod":
 			current = BsodScreen.new()
+			Sfx.stop_music()
 		_:
 			push_error("Unknown screen: " + id)
 			return

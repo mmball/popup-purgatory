@@ -73,6 +73,9 @@ This turns hallucinated APIs and wrong types into parse errors instead of runtim
 src/core/      pure logic, RefCounted, no nodes, unit tested, no `Game` autoload access
                (RunState, catalogs, SpawnSchedule, TargetAssigner, MetaSave, Tuning, Telemetry)
 src/ui/        reusable Win98 widgets (Win98, Win98Button, BevelPanel, WindowFrame, FloatText)
+               and Juice (tween helpers; cosmetic only, never touches game state)
+src/audio/     Sfx: static playback pool for assets/sfx and assets/music
+assets/        procedural OGGs written by tools/make_audio.py; regenerate, never hand-edit
 src/popups/    PopupBase, PopupContent, PopupSpawner; content/<type>_content.gd per pop-up type
 src/imps/      Imp, ImpManager
 src/village/   Village grid, Building, DesktopIcon
@@ -143,6 +146,13 @@ tools/botrun.sh /path/to/godot 10 greedy 100 3   # 10 seeded runs -> runs/*.json
 - Telemetry is append-only (`docs/TELEMETRY.md`): new events and fields are fine, renames
   and repurposing are not; `tools/balance.py` and anything downstream read the names.
 - Dev-arg keys accept `-` or `_` (`--max-wave` and `--max_wave` are the same key).
+- **Juice is cosmetic.** Anything in `Juice`/`Sfx` may animate, flash, shake or play a
+  sound; it may not change a number the run reads. `--no-juice` turns all of it off and
+  the bots, determinism check and sweeps run with it off, so a gameplay effect hidden in
+  an animation would show up as a juice-on/juice-off difference. Closing animations run
+  after the state change (`is_closing` is set first), never before.
+- Sound assets are procedural: edit the recipe in `tools/make_audio.py`, re-run it, commit
+  the OGGs. No sampled or generated-AI audio enters `assets/`.
 
 - Exit codes lie: Godot returns 0 with `SCRIPT ERROR` lines in stderr. `test.sh` greps the
   logs. Do the same for any ad-hoc run (`2>&1 | grep -E "SCRIPT ERROR|ERROR:"`).
@@ -152,7 +162,7 @@ tools/botrun.sh /path/to/godot 10 greedy 100 3   # 10 seeded runs -> runs/*.json
 - Dev flags (after `--`): `--screen=`, `--demo=1`, `--autoplay=1`, `--policy=greedy|random`,
   `--runs=N`, `--jsonl=path`, `--max-wave=N`, `--max-seconds=S`, `--seed=N`,
   `--ui=start|break`, `--noboot`, `--clock="12:00 AM"`, `--fresh-meta`, `--no-telemetry`,
-  `--telemetry-dir=path`, `--tune=k=v,...`, `--screenshot=path --delay=S --shots=N`.
+  `--telemetry-dir=path`, `--tune=k=v,...`, `--no-juice`, `--screenshot=path --delay=S --shots=N`.
 - Before claiming a visual change works, produce a screenshot and look at it. Before
   claiming a bug is fixed, reproduce it with a seed first.
 - Keep tasks small. One system per change. Run the loop before every commit.

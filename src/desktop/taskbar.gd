@@ -24,7 +24,9 @@ func _ready() -> void:
 	start_button = Win98Button.new("Start", Vector2(62, 22))
 	start_button.position = Vector2(2, 4)
 	start_button.extra_draw = _draw_flag
-	start_button.pressed.connect(func() -> void: start_pressed.emit())
+	start_button.pressed.connect(func() -> void:
+		Sfx.play("click", 0.8)
+		start_pressed.emit())
 	add_child(start_button)
 
 	var box := HBoxContainer.new()

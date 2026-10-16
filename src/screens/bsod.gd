@@ -3,17 +3,28 @@ extends Control
 ## The run summary, as a blue screen of death.
 
 const ACCEPT_DELAY := 0.8
+const TYPE_SPEED := 180.0  ## characters per second when the screen types itself out
 
 var _t := 0.0
+var _typed := 0.0
+var _last_tick := 0
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	var run: RunState = Game.last_run
+	if run != null and run.won and run.crash_reason == "CLOCKED_OUT":
+		Sfx.play("shutdown", 1.0, 0.0, 0.0)
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	_typed += delta * (TYPE_SPEED if Juice.enabled else 100000.0)
+	var tick := int(_typed / 40.0)
+	if Juice.enabled and tick != _last_tick and _typed < 2000.0:
+		_last_tick = tick
+		Sfx.play("typewriter", 1.0, -10.0, 0.2)
 	queue_redraw()
 
 
@@ -81,6 +92,11 @@ func _draw() -> void:
 		draw_rect(Rect2(cx - ts.x * 0.5, y - 2, ts.x, ts.y + 4), Win98.GRAY)
 		Win98.draw_text(self, Vector2(cx - ts.x * 0.5, y), title, Win98.BSOD_BLUE, 16)
 	y += 50
+	var budget := int(_typed)
 	for line: String in lines:
-		Win98.draw_text(self, Vector2(160, y), line, fg, 15)
+		if budget <= 0:
+			break
+		var shown := line.substr(0, mini(line.length(), budget))
+		budget -= line.length() + 1
+		Win98.draw_text(self, Vector2(160, y), shown, fg, 15)
 		y += 24

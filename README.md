@@ -47,6 +47,9 @@ src/
   village/                  Village grid, Building sprites, DesktopIcon
   desktop/                  Desktop screen, Taskbar, StartMenu, BreakDialog, ConfirmDialog
   screens/                  MainMenu (boot + unlock shop), BsodScreen (run summary)
+src/ui/juice.gd           tween helpers: pop-in, fold-out, flash, squash, hop, trauma shake
+src/audio/sfx.gd          sound playback pool; assets/ holds the procedural OGGs
+tools/make_audio.py       synthesises every sound and both music loops from code
   dev/autoplay.gd           bot that drives the real GUI with synthetic clicks
 tests/                      headless unit tests + runner
 tests/screenshots/          committed baselines for screenshot regression
@@ -138,6 +141,7 @@ Command-line dev options go after `--`:
 | `--clock="12:00 AM"` | freeze the taskbar clock (screenshot regression) |
 | `--tune=k=v,k=v` | override balance numbers for this process |
 | `--fresh-meta`, `--unlock-all=1`, `--tier=N`, `--overtime=1` | ignore the save file; play with every content unlock; pick a Service Pack; bots stay for overtime at 5 PM |
+| `--no-juice` | no animation, shake or sound (bots, determinism, sweeps) |
 | `--telemetry-dir=path`, `--no-telemetry` | where event logs go, or skip them |
 | `--policy=external --policy-dir=DIR --decision-interval=S` | hand decisions to `tools/policy_driver.py` |
 | `--seed=N` | deterministic run (spawns, upgrades, captcha words, imp wandering) |
@@ -158,5 +162,8 @@ Playable core loop. A run is one workday, 9 AM to 5 PM, eight waves of about a m
 upgrade picks between them; survive to 5 PM to clock out, or stay for endless Overtime.
 Eleven pop-up types (three of them earned through sideways unlocks), nine buildings, fifteen
 upgrades, an opt-in Service Pack difficulty ladder, telemetry on every run, and a bot harness
-that plays the whole thing headless. Numbers have been tuned against bots only; the next step
+that plays the whole thing headless. Windows pop in and fold away, imps squash and hop, the
+crash shakes and fills with static, and every event has a sound: the effects and both chiptune
+loops are synthesised from code (`tools/make_audio.py`), so no sampled or AI-generated audio
+is involved. Numbers have been tuned against bots only; the next step
 is human playtesting (`docs/BALANCE.md` says what to watch). See `docs/DESIGN.md`.

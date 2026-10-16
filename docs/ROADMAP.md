@@ -63,6 +63,13 @@ anyway.
 
 ### M2. Feel and feedback (weeks 3 to 7)
 
+Status 2026-10-16: first pass shipped ahead of M1 at the owner's request (window pop-in
+and fold-out, title flash, imp squash/hop/alert/sulk, trauma shake, static-and-shake crash,
+overload darkening and rising tone, scaled reward text, hour tally, typed-out BSOD, and
+thirteen procedural sounds plus two chiptune loops from `tools/make_audio.py`). Still open:
+a watched playtest reacting to it, music that a person has judged, and tuning of every
+timing once M1 has run.
+
 Goal: every player action has at least three feedback channels, and the game sounds like
 1998.
 
