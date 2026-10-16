@@ -106,6 +106,8 @@ func _draw_title_bar() -> void:
 
 
 func _draw_x_glyph(btn: Control, off: Vector2) -> void:
+	if btn is Win98Button and btn.label != "":
+		return  # a countdown is showing instead of the glyph (locked X)
 	var c := btn.size * 0.5 + off
 	var r := minf(btn.size.x, btn.size.y) * 0.25
 	var col := Win98.GRAY_DARK if btn.disabled else Win98.BLACK

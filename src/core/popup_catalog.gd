@@ -33,7 +33,7 @@ const DEFS := {
 	},
 	"error": {
 		"title": "Error",
-		"size": Vector2(320, 140),
+		"size": Vector2(320, 165),
 		"ram_cost": 6,
 		"dismiss_reward": 1,
 		"complete_reward": 2,
@@ -103,7 +103,7 @@ const DEFS := {
 	},
 	"toolbar": {
 		"title": "Searchy Toolbar Setup",
-		"size": Vector2(360, 220),
+		"size": Vector2(360, 180),
 		"ram_cost": 14,
 		"dismiss_reward": 1,
 		"complete_reward": 7,
@@ -117,7 +117,7 @@ const DEFS := {
 	},
 	"cookie": {
 		"title": "We value your privacy",
-		"size": Vector2(380, 230),
+		"size": Vector2(380, 200),
 		"ram_cost": 9,
 		"dismiss_reward": 1,
 		"complete_reward": 7,

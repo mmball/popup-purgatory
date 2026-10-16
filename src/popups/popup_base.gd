@@ -39,6 +39,8 @@ func setup(p_def: Dictionary, p_rng: RandomNumberGenerator, close_size: int, p_r
 	set_window_size(def["size"])
 	if x_locked_until > 0.0:
 		close_button.disabled = true
+		close_button.font_size = 10
+		_show_lock_countdown()
 
 	var script: GDScript = load(str(def["content"]))
 	content_node = script.new()
@@ -57,9 +59,14 @@ func _process(delta: float) -> void:
 		return
 	age += delta
 	total_age += delta
-	if x_locked_until > 0.0 and age >= x_locked_until:
-		x_locked_until = 0.0
-		close_button.disabled = false
+	if x_locked_until > 0.0:
+		if age >= x_locked_until:
+			x_locked_until = 0.0
+			close_button.disabled = false
+			close_button.label = ""
+			close_button.tooltip_text = ""
+		else:
+			_show_lock_countdown()
 	if lifetime > 0.0 and age >= lifetime:
 		age = 0.0
 		timeouts += 1
@@ -77,6 +84,16 @@ func _process(delta: float) -> void:
 
 func x_locked() -> bool:
 	return x_locked_until > 0.0
+
+
+## While the X is locked the button shows the seconds left, so the grey glyph
+## reads as "wait" rather than "broken".
+func _show_lock_countdown() -> void:
+	var left := int(ceil(x_locked_until - age))
+	var text := str(maxi(left, 1))
+	if close_button.label != text:
+		close_button.label = text
+		close_button.tooltip_text = "Unlocks in %d s" % left
 
 
 func is_imp_proof() -> bool:
