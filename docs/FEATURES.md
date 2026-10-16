@@ -35,7 +35,7 @@ free slot. `Building._draw` draws the bar and the sign. Telemetry: `train_start`
 `train_done`. Six seconds is deterministic (no RNG), so the determinism check is
 unaffected; `test_phase5` gains a slot-accounting test on a pure helper.
 
-## 1. Demolish and relocate buildings
+## 1. Demolish and relocate buildings — DONE 2026-10-16
 
 **Verdict.** Good, with the correction that dojos do not replace huts; the real uses are
 respec (you built RAM Sticks before the cookie banners arrived and now want a Help Desk)
@@ -54,13 +54,17 @@ and grid space on long overtime runs. Its value doubles once placement matters (
 - Relocate: during a break only, drag a building to a free cell for free. Needed only if
   item 2 ships.
 
-**Implementation.** `Building` stores `price_paid`. `Village` gains a demolish mode
-mirroring placement mode (hover cell, click, cancel). `Desktop._demolish(id, cell)`
-reverses the effect switch in `_build`, so the two live side by side and a test asserts
-build-then-demolish returns every modifier to its prior value. Telemetry `demolish`.
-External policy gains `sell:<cell>` moves; greedy and random ignore demolish.
+**Implementation.** `Building` stores `price_paid` and `cell`. `Village` gains a demolish
+mode mirroring placement mode (hover cell, click, cancel) and a drag-to-relocate mode the
+desktop enables during breaks. `Desktop.demolish(cell)` reverses the effect switch in
+`_build`; `BuildingCatalog.refund` holds the rates. Telemetry `demolish` and `relocate`.
+External policy gains `sell:<x>,<y>` moves; greedy and random never sell.
 
-## 2. Placement that matters: radius effects
+*Shipped as designed, with one change: a hut sale fires the imp homed at that hut (least
+valuable first), not "the most recent untrained imp", because imps now belong to huts
+(item 2).*
+
+## 2. Placement that matters: radius effects — DONE 2026-10-16 (step one)
 
 **Verdict.** The biggest upgrade to the "build a town" half of the pitch, and the
 riskiest: it adds a layer to a ten-minute game, needs new UI, and re-tunes everything.
@@ -82,13 +86,14 @@ earns its place in playtests.
 **Step two (maybe).** Adjacency bonuses (two huts touching share a cart; RAM Stick next to
 Firewall +8) only after human playtests show step one is understood.
 
-**Implementation.** `Building` gets `radius`; `Village.buildings_within(cell, r)`;
-`ImpManager.spawn_imp` records `home_cell`; speed and training lookups consult the
-village. Spawner's `_pick_position` rejects positions inside firewall rings (bounded
-retries, then anywhere). All of it goes through `Tuning` keys (`building.coffee.radius`)
-so a sweep can compare global versus local effects on the same seeds before the
-constants change. Greedy's placer must become radius-aware (place carts next to huts) or
-the bot data becomes meaningless; that is a day of work on the bot.
+**Implementation.** `BuildingCatalog.radius(id)` (Tuning `building.<id>.radius`);
+`Village.buildings_within(cell, r)`, `carts_in_range`, `firewall_zones`, square rings in
+placement and while the Start menu is open; `ImpManager.spawn_imp` records `home_cell`;
+speed (`speed_mult_for`) and training (`pick_trainee(dojo)`) consult the village. The
+spawner's `_pick_position` rejects windows overlapping a firewall circle (12 retries, then
+pushed outside the nearest ring). The bots place through `Village.suggest_cell(id)`
+(carts and dojos where they cover the most huts, firewalls spread out near the centre).
+Step two (adjacency) is still open.
 
 ## 3. Recycle Bin: drag a pop-up to delete it
 

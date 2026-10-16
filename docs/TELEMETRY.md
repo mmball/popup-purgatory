@@ -48,6 +48,8 @@ Written by `Telemetry` for every run, bot or human. Every row has
 | overload | active, seconds_left | RAM crossed the limit, or recovered |
 | train_start | imp, closes | an untrained imp sets off for a dojo |
 | train_done | imp, trained_total | it comes out trained (6 s later) |
+| demolish | id, cell, refund, bytes_after, owned_after | building sold (hut: its imp leaves) |
+| relocate | id, from, to | building dragged to a new cell during a break |
 | run_end | reason + `RunState.summary()` minus waves | run over |
 
 `popup_closed` also carries `streak` (manual completion streak after the close). Run rows

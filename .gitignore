@@ -20,3 +20,4 @@ det_*.log
 runs/
 __pycache__/
 *.pyc
+.claude/worktrees/

@@ -102,14 +102,18 @@ Unlockable types only enter the pool once their achievement is earned.
 
 ## Imps
 
-- Hired by Imp Huts. A dojo with a free slot (two per dojo) pulls the nearest idle
-  untrained imp: it walks in, a bar fills over the dojo for 6 s, and it comes out trained
-  (bigger body, black belt, mortarboard; it reads a book while completing).
+- Hired by Imp Huts; an imp remembers its hut as its home. A dojo with a free slot (two
+  per dojo) pulls the nearest idle untrained imp whose hut is within 2 cells (imps hired
+  by upgrades have no hut and train anywhere): it walks in, a bar fills over the dojo for
+  6 s, and it comes out trained (bigger body, black belt, mortarboard; it reads a book
+  while completing).
 - Experience: each close adds 2% speed, capped at +30% (15 closes); ten closes earn a
   service stripe. Idle near home, claim the oldest-ish nearby pop-up, walk to its X
   button, stand there for a work timer, close it.
 - Untrained imps dismiss (0.6s, X reward). Trained imps complete (per-type time, full
   completion reward). Dojos add two training slots each.
+- Coffee Carts are local: an imp moves 25% faster per cart within 2 cells of its hut
+  (carts stack). Selling the hut fires its imp: it walks off the edge of the desk.
 - Target assignment is exclusive (no two imps on one window), scored by
   `age * 25 - distance * 0.5`.
 - Imps ride along if you drag the window they're working on.
@@ -118,17 +122,34 @@ Unlockable types only enter the pool once their achievement is earned.
 
 | building | base cost | max | effect |
 | --- | --- | --- | --- |
-| Imp Hut | 20 | 12 | +1 imp |
-| Imp Dojo | 50 | 6 | +2 training slots |
-| Coffee Cart | 40 | 4 | imps 25% faster |
+| Imp Hut | 20 | 12 | +1 imp, homed at this cell |
+| Imp Dojo | 50 | 6 | +2 training slots for huts within 2 cells |
+| Coffee Cart | 40 | 4 | imps from huts within 2 cells 25% faster (stacks) |
 | RAM Stick | 35 | 6 | +32 RAM |
-| Firewall | 70 | 3 | spawns 15% slower |
+| Firewall | 70 | 3 | no pop-up spawns within 3 cells (a window may not overlap the ring) |
 | Antivirus Shrine | 60 | 1 | timeouts no longer multiply |
 | Pointer Shrine | 60 | 3 | +1 byte per manual close |
 | Help Desk (unlock) | 45 | 1 | imps can close Live Chat |
 | Screensaver (unlock) | 55 | 1 | every 30 s, 6 s with no spawns |
 
 Cost grows 50% per copy owned (`cost * (1 + 0.5 * owned)`).
+
+Radius effects (dojo 2, coffee 2, firewall 3, Chebyshev cells) are drawn as square rings
+while placing and while the Start menu is open. The other buildings stay global.
+
+### Demolish and relocate
+
+- Start menu, "Demolish...": hovering an owned building tints it red and shows
+  "Sell for N"; click sells, right-click or Escape leaves the mode. Refund is 50% of the
+  price paid, 75% during a coffee break.
+- Reversals: hut fires that hut's imp (the least valuable one homed there, untrained
+  before trained, fewest closes); dojo loses its two slots and kicks out a trainee
+  untrained (graduates stay trained); coffee and firewall effects vanish with the
+  building; RAM Stick is refused while removing it would put RAM over the new max
+  ("would crash"); antivirus lets timeouts multiply again unless Hotfix KB98 was taken;
+  shrine drops the click bonus; help desk and screensaver switch off.
+- Relocate: during a break only, drag a building to a free cell for free. A moved hut
+  takes its imp's home with it. Firewall rings and cart coverage follow the building.
 
 ## Upgrades (coffee break, pick 1 of 3)
 

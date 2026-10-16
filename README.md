@@ -21,7 +21,8 @@ imp and building is drawn in code.
 
 Controls are mouse-first. **Start** button or **B** opens the build menu, **1-7** picks a
 building directly, **Esc** cancels placement, right-click also cancels. Drag windows by
-their title bar.
+their title bar. **Demolish...** in the Start menu sells a building (half price back,
+three quarters during a break); during a break you can also drag buildings to new cells.
 
 The full design is in [`docs/DESIGN.md`](docs/DESIGN.md); the plan to a published game is
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the next gameplay features, each with a verdict and an
