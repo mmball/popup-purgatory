@@ -169,11 +169,30 @@ while placing and while the Start menu is open. The other buildings stay global.
 
 ## Upgrades (coffee break, pick 1 of 3)
 
+Keyboard Shortcuts (Task Manager cooldown), Admin Rights (Task Manager ends 5),
 Bigger X Buttons, Memory Upgrade (+24 RAM), Espresso Shots (imp speed), Quick Hands (imp
 work speed), Reflex Clicking (X pays double), Thoroughness (completion +50%), Ad Blocker
 trial (spawn slower), Stray Imp (free imp), Lean Windows (-2 RAM per pop-up), Mouse Blessing
 (+1 per manual close), Hotfix KB98 (no multiplication), Found Change (+40 bytes).
 Unlockable: Consent Manager, Do Not Disturb, Garbage Collector (see Targeted challenges).
+
+## Abilities (keyboard chords and tray icons)
+
+Three things the keyboard can do under pressure, each also a clickable icon in the
+taskbar tray with its cooldown drawn as a rising sweep:
+
+| ability | chord | cooldown | effect |
+| --- | --- | --- | --- |
+| Alt+F4 | Alt+F4 | none | dismisses the front window (a keyboard X; refuses a locked X) |
+| Task Manager | Ctrl+Shift+Esc | 45 s | a Win98 Task Manager lists open pop-ups, biggest RAM first; End Task closes the selected one instantly (locked or not) for its dismiss reward, 3 times per use (5 with Admin Rights); imps keep working |
+| Ctrl+Alt+Del | Ctrl+Alt+Del, held | once per hour | the desk freezes while held: no spawns, no ageing, no RAM growth, no clock; the screen dims and a bar fills; hold past 5 s and the machine resets (BSOD, reason RESET) |
+
+Alt+F4 and End Task are manual dismisses, so they reset a streak like any X. Nothing
+is ready during a break. Keyboard Shortcuts (upgrade) recharges Task Manager 25% faster
+per pick; Admin Rights raises its ends to five. Cooldowns are tunable as
+`ability.<id>.cooldown`, the hold limit as `ability.freeze_max`. Bots cannot hold a
+key: the external policy's `ability:ctrl_alt_del` releases after 4 s; greedy opens Task
+Manager above 80% RAM and clicks End Task until the uses run out.
 
 ## Meta-progression
 

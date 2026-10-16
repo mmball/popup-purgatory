@@ -55,8 +55,8 @@ func setup(p_def: Dictionary, p_rng: RandomNumberGenerator, close_size: int, p_r
 
 
 func _process(delta: float) -> void:
-	if is_closing:
-		return
+	if is_closing or (run != null and run.frozen):
+		return  # Ctrl+Alt+Del holds every window still
 	age += delta
 	total_age += delta
 	if x_locked_until > 0.0:

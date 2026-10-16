@@ -46,6 +46,23 @@ var best_streak := 0
 const OVERTIME_PAY := 1.5
 const OVERTIME_SPAWN_STEP := 0.9   ## interval multiplier per overtime hour
 
+# --- abilities: keyboard chords (and tray icons) with cooldowns ---
+const ABILITIES := {
+	"alt_f4": {"name": "Alt+F4", "cooldown": 0.0, "desc": "Dismiss the front window."},
+	"task_manager": {"name": "Task Manager", "cooldown": 45.0, "desc": "Ctrl+Shift+Esc: End Task on a few pop-ups instantly."},
+	"ctrl_alt_del": {"name": "Ctrl+Alt+Del", "cooldown": 0.0, "desc": "Hold to freeze the desk for up to 5 s, once an hour. Hold too long and the machine resets."},
+}
+const ABILITY_ORDER: Array[String] = ["alt_f4", "task_manager", "ctrl_alt_del"]
+const FREEZE_MAX := 5.0           ## seconds Ctrl+Alt+Del may be held before the reset
+const TASK_MANAGER_ENDS := 3
+var ability_cooldowns := {}       ## id -> seconds left
+var cooldown_mult := 1.0          ## Keyboard Shortcuts upgrade lowers it
+var task_manager_ends := TASK_MANAGER_ENDS
+var cad_used_this_hour := false
+var frozen := false
+var freeze_time := 0.0            ## seconds the current freeze has been held
+var abilities_used := {}          ## id -> times used this run
+
 # --- content pools unlocked for this run (ids); empty means catalog default ---
 var unlocked_popups: Array[String] = []
 var unlocked_buildings: Array[String] = []
@@ -115,7 +132,7 @@ func summary() -> Dictionary:
 		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log, "tune": Tuning.spec,
 		"tier": tier, "won": won, "overtime": overtime, "banked_score": banked_score,
 		"final_score": final_score(), "best_streak": best_streak,
-		"bin_items": bin_items, "popups_recycled": popups_recycled,
+		"bin_items": bin_items, "popups_recycled": popups_recycled, "abilities": abilities_used,
 	}
 
 
@@ -158,6 +175,7 @@ func start_wave(w: int) -> void:
 	wave = w
 	wave_time_left = wave_duration(w)
 	in_break = false
+	cad_used_this_hour = false
 	wave_changed.emit(wave)
 	break_changed.emit(false)
 
@@ -168,8 +186,58 @@ func tick(delta: float) -> void:
 	elapsed += delta
 	if in_break:
 		return
+	if frozen:
+		# Ctrl+Alt+Del: the clock, the overload timer and (via `frozen`) every
+		# pop-up and spawn hold still; hold it past FREEZE_MAX and the box resets.
+		freeze_time += delta
+		if freeze_time >= Tuning.num("ability.freeze_max", FREEZE_MAX):
+			end_freeze()
+			crash("RESET")
+		return
 	wave_time_left = maxf(0.0, wave_time_left - delta)
+	for id: String in ability_cooldowns.keys():
+		ability_cooldowns[id] = maxf(0.0, float(ability_cooldowns[id]) - delta)
 	_check_overload(delta)
+
+
+# ---------- abilities ----------
+
+## Full cooldown for an ability after modifiers (Tuning key ability.<id>.cooldown).
+func ability_cooldown(id: String) -> float:
+	assert(ABILITIES.has(id), "Unknown ability: " + id)
+	return Tuning.num("ability.%s.cooldown" % id, float(ABILITIES[id]["cooldown"])) * cooldown_mult
+
+
+func ability_cooldown_left(id: String) -> float:
+	return float(ability_cooldowns.get(id, 0.0))
+
+
+func ability_ready(id: String) -> bool:
+	assert(ABILITIES.has(id), "Unknown ability: " + id)
+	if crashed_flag or in_break:
+		return false
+	if id == "ctrl_alt_del":
+		return not cad_used_this_hour and not frozen
+	return ability_cooldown_left(id) <= 0.0
+
+
+## Spends the ability: starts its cooldown (or marks the hour's Ctrl+Alt+Del
+## used) and counts it. False when it was not ready.
+func use_ability(id: String) -> bool:
+	if not ability_ready(id):
+		return false
+	abilities_used[id] = int(abilities_used.get(id, 0)) + 1
+	if id == "ctrl_alt_del":
+		cad_used_this_hour = true
+		frozen = true
+		freeze_time = 0.0
+	else:
+		ability_cooldowns[id] = ability_cooldown(id)
+	return true
+
+
+func end_freeze() -> void:
+	frozen = false
 
 
 func wave_finished() -> bool:

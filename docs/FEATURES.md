@@ -122,7 +122,7 @@ screen and keeps ageing) that is hard to read and easy to forget, which is the o
 of what the attention game wants. Revisit only if playtests ask for "put this away for a
 moment".
 
-## 5. Active abilities with cooldowns (system tray)
+## 5. Active abilities with cooldowns (system tray) — DONE 2026-10-16
 
 **Verdict.** Yes. This is the roguelite ingredient the game lacks: a decision under
 pressure beyond "which window". Thematic hooks write themselves.
@@ -143,6 +143,11 @@ pressure beyond "which window". Thematic hooks write themselves.
 (pure, tested). `Desktop._unhandled_input` maps the chords; the Task Manager is a
 `WindowFrame`. Telemetry `ability` with id. External policy gains `ability:<id>` moves;
 greedy uses Task Manager when RAM is above 80% so bot batches reflect the feature.
+
+*Shipped as designed with three changes: Ctrl+Alt+Del is hold-to-freeze (release ends
+it; past 5 s the machine resets with a RESET BSOD), which makes the reset a real gamble
+instead of a timer; the tray icons are clickable so mouse-only play keeps every ability;
+the Server Room building is not built, the two upgrades cover cooldowns for now.*
 
 ## 6. Completion streaks — DONE 2026-10-16
 

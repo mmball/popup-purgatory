@@ -212,6 +212,17 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		var refund := BuildingCatalog.refund(b.price_paid, run.in_break)
 		moves.append({"id": "sell:%d,%d" % [c.x, c.y], "kind": "sell", "building": b.id, "cell": [c.x, c.y], "refund": refund,
 			"desc": "sell the %s at %d,%d for %d bytes" % [BuildingCatalog.DEFS[b.id]["name"], c.x, c.y, refund]})
+	var abilities := {}
+	for aid: String in RunState.ABILITY_ORDER:
+		abilities[aid] = {"ready": run.ability_ready(aid), "cooldown_left": snappedf(run.ability_cooldown_left(aid), 0.1)}
+	if not desktop.break_dialog.visible:
+		var front := desktop.front_popup()
+		if run.ability_ready("alt_f4") and front != null and not front.x_locked():
+			moves.append({"id": "ability:alt_f4", "kind": "ability", "ability": "alt_f4", "desc": "Alt+F4: X the front window, the %s (+%d bytes)" % [front.type_id, run.reward_for(front.def, false)]})
+		if run.ability_ready("task_manager") and desktop.task_manager == null and not desktop.imp_manager.live_popups().is_empty():
+			moves.append({"id": "ability:task_manager", "kind": "ability", "ability": "task_manager", "desc": "Task Manager: instantly X the %d biggest-RAM windows (locked or not) for their dismiss rewards; %.0f s cooldown" % [run.task_manager_ends, run.ability_cooldown("task_manager")]})
+		if run.ability_ready("ctrl_alt_del"):
+			moves.append({"id": "ability:ctrl_alt_del", "kind": "ability", "ability": "ctrl_alt_del", "desc": "Ctrl+Alt+Del: freeze every window and spawn for 4 s (no ageing, no RAM growth); once an hour"})
 	var buildings := {}
 	for id: String in BuildingCatalog.ORDER:
 		buildings[id] = desktop.village.count(id)
@@ -223,6 +234,7 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		"overloaded": run.overloaded, "imps": desktop.imp_manager.imps.size(), "trained": desktop.imp_manager.count_trained(),
 		"buildings": buildings, "owned_buildings": owned_buildings, "upgrades": run.upgrades_picked, "popups": popups, "legal_moves": moves,
 		"bin": {"items": run.bin_items, "capacity": Tuning.inum("run.bin_capacity", RunState.BIN_CAPACITY), "emptying": desktop._bin_emptying},
+		"abilities": abilities,
 	}
 
 
@@ -292,6 +304,8 @@ func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> vo
 				desktop._on_popup_dropped(p, desktop.village.bin_rect().get_center())
 		"empty_bin":
 			desktop.empty_bin()
+		"ability":
+			_use_ability(desktop, parts[1])
 		"pick":
 			for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
 				var card := b.get_parent().get_parent()
@@ -299,6 +313,22 @@ func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> vo
 				if UpgradeCatalog.DEFS.has(parts[1]) and name_l.text == UpgradeCatalog.DEFS[parts[1]]["name"]:
 					_click(_center(b))
 					return
+
+
+## Uses an ability the way a driver asked: Task Manager ends its full quota
+## at once (biggest RAM first, the window's default selection); Ctrl+Alt+Del
+## is held for 4 s of game time since a bot cannot hold a key.
+func _use_ability(desktop: Desktop, id: String) -> void:
+	if not desktop.use_ability(id):
+		return
+	match id:
+		"task_manager":
+			var guard := desktop.run.task_manager_ends
+			while desktop.task_manager != null and guard > 0:
+				desktop.task_manager.end_selected()
+				guard -= 1
+		"ctrl_alt_del":
+			desktop.freeze_for(4.0)
 
 
 # ---------- greedy ----------
@@ -319,6 +349,17 @@ func _step_greedy(desktop: Desktop) -> void:
 			_click(desktop.village.cell_center(cell))
 		else:
 			desktop.village.cancel_place()
+		return
+	if desktop.task_manager != null:
+		# End Task until the uses run out (the window closes itself), through the GUI.
+		var end_btn := _find_button(desktop.task_manager, "End Task")
+		if end_btn != null and not end_btn.disabled:
+			_click(_center(end_btn))
+		else:
+			_click(_center(_find_button(desktop.task_manager, "Close")))
+		return
+	if run.ram_fraction() > 0.8 and run.ability_ready("task_manager") and not desktop.imp_manager.live_popups().is_empty():
+		desktop.use_ability("task_manager")  # the chord; the next steps click End Task
 		return
 	if desktop.start_menu.visible:
 		var avail := BuildingCatalog.available(run.unlocked_buildings)

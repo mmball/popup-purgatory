@@ -44,6 +44,7 @@ How the game works:
 - Bytes buy buildings. Imp Huts hire imps who walk to pop-ups and dismiss them for you; an Imp Dojo trains two imps from huts within 2 cells to complete instead; RAM Sticks raise ram_max; Coffee Carts speed imps from huts within 2 cells; nothing spawns within 3 cells of a Firewall; the Antivirus Shrine stops timeouts from multiplying; the Pointer Shrine pays +1 per pop-up you close yourself. Building prices rise with each copy. The bot places each building where its radius helps most.
 - A "sell" move demolishes one of your buildings for a refund (half its price, three quarters during a break); owned_buildings lists what you have.
 - A "recycle" move drags a pop-up to the Recycle Bin: it vanishes with no reward and no penalty (a recycled cookie banner spawns nothing), freeing its RAM. The bin holds bin.capacity windows; "empty_bin" clears it but takes 2 seconds, during which nothing can be dropped. It is an emergency valve, not a free X.
+- "ability" moves are keyboard chords: alt_f4 X-es the front window (free), task_manager instantly X-es the biggest windows (45 s cooldown), ctrl_alt_del freezes the desk for 4 s once an hour; abilities shows what is ready.
 - Between waves you pick one of three upgrades.
 - Spending bytes never lowers your score (score = total bytes earned), so build whenever it helps.
 Strategy hints: keep ram_used comfortably under ram_max; prefer complete over dismiss when RAM is safe; buy huts early; when nothing is urgent, choose "wait"."""
@@ -97,6 +98,11 @@ def heuristic(state):
     for p in sorted(popups, key=lambda p: -p["ram_cost"]):
         if p.get("leak") and f"complete:{p['id']}" in moves:
             return f"complete:{p['id']}", "leak growing"
+    # 1c. abilities: Task Manager under RAM pressure, Ctrl+Alt+Del when overloaded
+    if pressure > 0.8 and "ability:task_manager" in moves:
+        return "ability:task_manager", f"task manager at ram {pressure:.2f}"
+    if state.get("overloaded") and "ability:ctrl_alt_del" in moves:
+        return "ability:ctrl_alt_del", "freeze while overloaded"
     # 2. RAM pressure: dismiss the costliest (never a cookie banner: X-ing it spawns more)
     if pressure > 0.7 and popups:
         for p in sorted(popups, key=lambda p: -p["ram_cost"]):

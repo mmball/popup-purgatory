@@ -27,6 +27,9 @@ var _wall: ColorRect
 var _rise_timer := 0.0
 var _wave_score_start := 0
 var _shake_rng := RandomNumberGenerator.new()  # cosmetic only; seeded so screenshots are stable
+var task_manager: TaskManager       ## open Task Manager window, or null
+var _freeze_overlay: Control        ## dimmer shown while Ctrl+Alt+Del is held
+var _freeze_auto := -1.0            ## bots: release the freeze after this many seconds
 
 
 func _ready() -> void:
@@ -78,6 +81,10 @@ func _ready() -> void:
 	taskbar.size = Vector2(1280, TASKBAR_H)
 	taskbar.start_pressed.connect(_toggle_start_menu)
 	taskbar.tooltip_text = "Run seed: %d" % run.seed
+	taskbar.ability_pressed.connect(func(id: String) -> void: use_ability(id))
+	taskbar.ability_released.connect(func(id: String) -> void:
+		if id == "ctrl_alt_del":
+			_end_freeze())
 	add_child(taskbar)
 
 	start_menu = StartMenu.new()
@@ -124,6 +131,11 @@ func _ready() -> void:
 			_begin_place("hut")
 		"gallery0", "gallery1", "gallery2":
 			_gallery(int(str(Game.dev["ui"]).substr(7)))
+		"taskman":
+			use_ability("task_manager")
+		"freeze":
+			use_ability("ctrl_alt_del")
+			freeze_for(2.0)
 
 
 ## Dev: lay out one of each pop-up type on a grid with the spawner off, for
@@ -237,6 +249,13 @@ func _process(delta: float) -> void:
 		return
 	run.tick(delta)
 	_feel(delta)
+	if _freeze_overlay != null:
+		if run.frozen:
+			_freeze_overlay.queue_redraw()
+			if _freeze_auto >= 0.0 and run.freeze_time >= _freeze_auto:
+				_end_freeze()
+		else:
+			_end_freeze()  # the tick ended it: held too long, the machine reset
 	if run.workday_over():
 		_workday_end()
 	elif run.wave_finished():
@@ -442,6 +461,8 @@ func _start_break() -> void:
 	_log("upgrade_offered", {"ids": offered})
 	break_dialog.show_choices(run.wave, choices)
 	break_dialog.center_in_parent()
+	_close_task_manager()
+	_end_freeze()
 	village.cancel_place()
 	village.cancel_demolish()
 	village.set_relocate_enabled(true)  # drag buildings around for free until the break ends
@@ -756,6 +777,7 @@ func _end(reason: String) -> void:
 	_ended = true
 	set_process(false)
 	spawner.active = false
+	_close_task_manager()
 	village.cancel_demolish()
 	village.set_relocate_enabled(false)
 	run.crash_reason = reason
@@ -783,10 +805,26 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _ended or not (event is InputEventKey) or not event.pressed or event.echo:
+	if _ended or not (event is InputEventKey):
 		return
 	var key: InputEventKey = event
-	if key.keycode == KEY_ESCAPE:
+	if not key.pressed:
+		# Letting go of any key of the chord ends a Ctrl+Alt+Del freeze.
+		if run.frozen and (key.keycode == KEY_DELETE or key.keycode == KEY_CTRL or key.keycode == KEY_ALT):
+			_end_freeze()
+		return
+	if key.echo:
+		return
+	if key.keycode == KEY_DELETE and key.ctrl_pressed and key.alt_pressed:
+		use_ability("ctrl_alt_del")
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_ESCAPE and key.ctrl_pressed and key.shift_pressed:
+		use_ability("task_manager")
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_F4 and key.alt_pressed:
+		use_ability("alt_f4")
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_ESCAPE:
 		if village.is_busy():
 			village.cancel_place()
 			village.cancel_demolish()
@@ -804,6 +842,117 @@ func _unhandled_input(event: InputEvent) -> void:
 		if idx < avail.size() and not run.in_break:
 			_begin_place(avail[idx])
 			get_viewport().set_input_as_handled()
+
+
+# ---------- abilities (docs/FEATURES.md item 5) ----------
+
+## The front-most live pop-up (the one Alt+F4 would close), or null.
+func front_popup() -> PopupBase:
+	var kids := popup_layer.get_children()
+	for i in range(kids.size() - 1, -1, -1):
+		if kids[i] is PopupBase and not (kids[i] as PopupBase).is_closing:
+			return kids[i]
+	return null
+
+
+## Uses an ability by id (keyboard chord, tray icon, or a bot). Returns false,
+## with a float saying why, when it was not ready or had nothing to act on.
+func use_ability(id: String) -> bool:
+	if _ended:
+		return false
+	var at := Vector2(1100, DESKTOP_H - 40)
+	if not run.ability_ready(id):
+		var why := "spent this hour" if id == "ctrl_alt_del" else "recharging"
+		_float("%s: %s" % [RunState.ABILITIES[id]["name"], why], at, Color("ff6060"), 12)
+		return false
+	match id:
+		"alt_f4":
+			var front := front_popup()
+			if front == null:
+				_float("Alt+F4: nothing to close", at, Color("ff6060"), 12)
+				return false
+			if front.x_locked():
+				_float("Alt+F4: that X is locked", front.global_position + Vector2(front.size.x * 0.5, 10), Color("ff6060"), 12)
+				return false
+			run.use_ability(id)
+			_log("ability", {"id": id, "type": front.type_id})
+			front.dismiss(false)
+		"task_manager":
+			if task_manager != null:
+				task_manager.raise()
+				return false
+			run.use_ability(id)
+			_log("ability", {"id": id, "ends": run.task_manager_ends})
+			_open_task_manager()
+		"ctrl_alt_del":
+			run.use_ability(id)
+			_log("ability", {"id": id})
+			_show_freeze()
+	return true
+
+
+## Bots cannot hold a key: release the freeze after `seconds` of game time.
+func freeze_for(seconds: float) -> void:
+	_freeze_auto = seconds
+
+
+func _open_task_manager() -> void:
+	task_manager = TaskManager.new(popup_layer, run.task_manager_ends)
+	task_manager.drag_bounds = Rect2(Vector2.ZERO, Vector2(1280, DESKTOP_H))
+	task_manager.end_task_requested.connect(func(p: PopupBase) -> void:
+		_log("task_ended", {"type": p.type_id, "ends_left": task_manager.ends_left if task_manager != null else 0})
+		p.dismiss(false))
+	task_manager.close_requested.connect(_close_task_manager)
+	add_child(task_manager)
+	task_manager.position = Vector2(450, 190)
+	Sfx.play("warn", 1.1)
+
+
+func _close_task_manager() -> void:
+	if task_manager == null:
+		return
+	var tm := task_manager
+	task_manager = null
+	Juice.pop_out(tm, tm.queue_free)
+
+
+func _show_freeze() -> void:
+	_freeze_overlay = Control.new()
+	_freeze_overlay.size = Vector2(1280, DESKTOP_H)
+	_freeze_overlay.mouse_filter = Control.MOUSE_FILTER_STOP  # nothing under it takes clicks
+	_freeze_overlay.z_index = 6  # imps draw at z 5; the dimmer covers them too
+	_freeze_overlay.draw.connect(_draw_freeze.bind(_freeze_overlay))
+	add_child(_freeze_overlay)
+	move_child(_freeze_overlay, taskbar.get_index())  # above the desk, under the taskbar
+	Sfx.play("warn", 0.7)
+
+
+func _draw_freeze(o: Control) -> void:
+	o.draw_rect(Rect2(Vector2.ZERO, o.size), Color(0, 0, 0.1, 0.5))
+	var limit := Tuning.num("ability.freeze_max", RunState.FREEZE_MAX)
+	var frac := clampf(run.freeze_time / limit, 0.0, 1.0)
+	var msg := "Ctrl+Alt+Del: the desk is frozen. Let go before the bar fills or the machine resets."
+	var ts := Win98.text_size(msg, 16)
+	o.draw_rect(Rect2(Vector2(400, 282), Vector2(480, 104)), Color(0, 0, 0.25))
+	o.draw_rect(Rect2(Vector2(400, 282), Vector2(480, 104)), Win98.WHITE, false, 1.0)
+	Win98.draw_text(o, Vector2((o.size.x - ts.x) * 0.5, 300), msg, Color.WHITE, 16)
+	var bar := Rect2(Vector2(440, 340), Vector2(400, 18))
+	o.draw_rect(bar, Win98.GRAY)
+	o.draw_rect(Rect2(bar.position, Vector2(bar.size.x * frac, bar.size.y)), Color(1.0, 1.0 - frac, 0.2))
+	o.draw_rect(bar, Win98.BLACK, false, 1.0)
+	Win98.draw_text(o, Vector2(640 - 20, 366), "%.1f s" % run.freeze_time, Color.WHITE, 12)
+
+
+func _end_freeze() -> void:
+	if _freeze_overlay == null:
+		return
+	var held := run.freeze_time
+	if run.frozen:
+		run.end_freeze()
+	_freeze_auto = -1.0
+	_log("freeze", {"held": snappedf(held, 0.01), "reset": run.crashed_flag})
+	_freeze_overlay.queue_free()
+	_freeze_overlay = null
 
 
 # ---------- helpers ----------

@@ -35,7 +35,7 @@ func setup(p_run: RunState, p_rng: RandomNumberGenerator, p_layer: Control) -> v
 
 
 func _process(delta: float) -> void:
-	if run == null or run.crashed_flag or run.in_break or not active:
+	if run == null or run.crashed_flag or run.in_break or run.frozen or not active:
 		return
 	var i := _queued.size() - 1
 	while i >= 0:

@@ -161,6 +161,8 @@ func _train(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if run != null and run.frozen:
+		return  # Ctrl+Alt+Del: imps freeze with everything else
 	_t += delta
 	_alert_t = maxf(0.0, _alert_t - delta)
 	_sulk_t = maxf(0.0, _sulk_t - delta)

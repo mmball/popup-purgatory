@@ -52,6 +52,9 @@ Written by `Telemetry` for every run, bot or human. Every row has
 | relocate | id, from, to | building dragged to a new cell during a break |
 | recycled | type, age, ram_used, bin_items | pop-up dropped into the Recycle Bin (no reward, RAM freed) |
 | bin_emptied | (none) | "Empty Recycle Bin" finished, 2 s after the double-click |
+| ability | id (+ type for alt_f4, ends for task_manager) | a chord or tray icon was used |
+| task_ended | type, ends_left | End Task closed a window from the Task Manager |
+| freeze | held, reset (bool) | a Ctrl+Alt+Del freeze ended (reset: it was held past the limit) |
 | run_end | reason + `RunState.summary()` minus waves | run over |
 
 `popup_closed` also carries `streak` (manual completion streak after the close). Run rows

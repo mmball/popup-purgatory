@@ -71,6 +71,8 @@ func rehome(from: Vector2i, to: Vector2i, new_home: Vector2) -> void:
 
 
 func _process(_delta: float) -> void:
+	if run != null and run.frozen:
+		return
 	_assign_training()
 
 

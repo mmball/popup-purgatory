@@ -19,6 +19,8 @@ const DEFS := {
 	"consent_manager": {"name": "Consent Manager", "desc": "Cookie banners come pre-rejected: one click completes them.", "max": 1, "unlock": "clock_out"},
 	"do_not_disturb": {"name": "Do Not Disturb", "desc": "Live Chat widgets appear half as often.", "max": 1, "unlock": "hundred_closed"},
 	"garbage_collector": {"name": "Garbage Collector", "desc": "Memory leaks grow half as fast.", "max": 1, "unlock": "dojo_built"},
+	"keyboard_shortcuts": {"name": "Keyboard Shortcuts", "desc": "Task Manager recharges 25% faster.", "max": 2},
+	"admin_rights": {"name": "Admin Rights", "desc": "Task Manager ends 5 tasks per use instead of 3.", "max": 1},
 }
 
 
@@ -90,4 +92,8 @@ static func apply(id: String, run: RunState) -> String:
 			run.chat_spawn_mult *= 0.5
 		"garbage_collector":
 			run.leak_growth_mult *= 0.5
+		"keyboard_shortcuts":
+			run.cooldown_mult *= 0.75
+		"admin_rights":
+			run.task_manager_ends = 5
 	return ""

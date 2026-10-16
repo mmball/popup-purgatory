@@ -3,6 +3,8 @@ extends Control
 ## Bottom bar: Start button, run readouts, and a clock in the tray.
 
 signal start_pressed
+signal ability_pressed(id: String)    ## tray icon pressed (Ctrl+Alt+Del holds while pressed)
+signal ability_released(id: String)
 
 var start_button: Win98Button
 var _bytes: Label
@@ -12,6 +14,9 @@ var _imps: Label
 var _streak: Label
 var _clock: Label
 var _tray: BevelPanel
+var _abilities: Control          ## tray icons with cooldown sweeps
+var _held_ability := ""
+const ICON_W := 22
 var _blink := 0.0
 var _run: RunState
 
@@ -42,11 +47,19 @@ func _ready() -> void:
 	_streak = _readout(box, "Streak: 0", 96)
 
 	_tray = BevelPanel.new(true)
-	_tray.size = Vector2(72, 22)
+	_tray.size = Vector2(72 + ICON_W * RunState.ABILITY_ORDER.size(), 22)
 	add_child(_tray)
+	_abilities = Control.new()
+	_abilities.position = Vector2(2, 1)
+	_abilities.size = Vector2(ICON_W * RunState.ABILITY_ORDER.size(), 20)
+	_abilities.mouse_filter = Control.MOUSE_FILTER_STOP
+	_abilities.tooltip_text = "Alt+F4: dismiss the front window.  Ctrl+Shift+Esc: Task Manager.  Ctrl+Alt+Del: hold to freeze (once an hour)."
+	_abilities.draw.connect(_draw_abilities)
+	_abilities.gui_input.connect(_on_abilities_input)
+	_tray.add_child(_abilities)
 	_clock = Label.new()
 	_clock.add_theme_font_size_override("font_size", 12)
-	_clock.position = Vector2(8, 2)
+	_clock.position = Vector2(8 + ICON_W * RunState.ABILITY_ORDER.size(), 2)
 	_tray.add_child(_clock)
 	resized.connect(_layout)
 	_layout()
@@ -83,8 +96,54 @@ func _draw_flag(btn: Control, off: Vector2) -> void:
 		btn.draw_rect(Rect2(p, Vector2(5, 5)), cols[i])
 
 
+func _on_abilities_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton) or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if event.pressed:
+		var i := int(event.position.x / ICON_W)
+		if i >= 0 and i < RunState.ABILITY_ORDER.size():
+			_held_ability = RunState.ABILITY_ORDER[i]
+			ability_pressed.emit(_held_ability)
+	elif _held_ability != "":
+		ability_released.emit(_held_ability)
+		_held_ability = ""
+
+
+## Three tray glyphs: a key cap (Alt+F4), a little task list (Task Manager)
+## and a red reset button (Ctrl+Alt+Del). A grey sweep rises while an ability
+## recharges; a spent Ctrl+Alt+Del is greyed until the next hour.
+func _draw_abilities() -> void:
+	for i in range(RunState.ABILITY_ORDER.size()):
+		var id: String = RunState.ABILITY_ORDER[i]
+		var o := Vector2(i * ICON_W + 3, 2)
+		var ready := _run != null and _run.ability_ready(id)
+		var ink := Win98.BLACK if ready else Win98.GRAY_DARK
+		match id:
+			"alt_f4":
+				_abilities.draw_rect(Rect2(o, Vector2(16, 16)), Win98.WHITE if ready else Win98.GRAY_LIGHT)
+				_abilities.draw_rect(Rect2(o, Vector2(16, 16)), ink, false, 1.0)
+				Win98.draw_text(_abilities, o + Vector2(2, 1), "F4", ink, 9)
+			"task_manager":
+				_abilities.draw_rect(Rect2(o, Vector2(16, 16)), Win98.WHITE if ready else Win98.GRAY_LIGHT)
+				_abilities.draw_rect(Rect2(o, Vector2(16, 3)), Win98.TITLE_A if ready else Win98.GRAY_DARK)
+				for r in range(3):
+					_abilities.draw_rect(Rect2(o + Vector2(2, 5 + r * 3), Vector2(12 - r * 3, 2)), ink)
+				_abilities.draw_rect(Rect2(o, Vector2(16, 16)), ink, false, 1.0)
+			"ctrl_alt_del":
+				_abilities.draw_rect(Rect2(o, Vector2(16, 16)), Win98.GRAY_LIGHT)
+				_abilities.draw_rect(Rect2(o, Vector2(16, 16)), ink, false, 1.0)
+				_abilities.draw_circle(o + Vector2(8, 8), 5.0, Color("d00000") if ready else Win98.GRAY_DARK)
+				_abilities.draw_circle(o + Vector2(8, 8), 5.0, ink, false, 1.0)
+		if _run != null and _run.ability_cooldown_left(id) > 0.0:
+			var frac := _run.ability_cooldown_left(id) / maxf(0.001, _run.ability_cooldown(id))
+			_abilities.draw_rect(Rect2(o + Vector2(0, 16.0 * (1.0 - frac)), Vector2(16, 16.0 * frac)), Color(0, 0, 0, 0.45))
+			Win98.draw_text(_abilities, o + Vector2(1, 3), "%d" % int(ceil(_run.ability_cooldown_left(id))), Win98.WHITE, 10)
+
+
 func _process(delta: float) -> void:
 	_blink += delta
+	if _abilities != null:
+		_abilities.queue_redraw()
 	if Game.dev.has("clock"):
 		_clock.text = str(Game.dev["clock"])  # frozen for screenshot regression
 		return
