@@ -23,7 +23,8 @@ Controls are mouse-first. **Start** button or **B** opens the build menu, **1-7*
 building directly, **Esc** cancels placement, right-click also cancels. Drag windows by
 their title bar.
 
-The full design is in [`docs/DESIGN.md`](docs/DESIGN.md).
+The full design is in [`docs/DESIGN.md`](docs/DESIGN.md); the plan to a published game is
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Layout
 

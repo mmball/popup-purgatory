@@ -150,8 +150,8 @@ The BSOD lists wave, bytes, closes by you vs imps, imps hired, buildings built, 
 
 ## Roadmap
 
-Phases 1 to 5 of the research roadmap are done (foundation, engine 4.7, verification
-harness, telemetry and balancing tools, core loop and content). Remaining:
+The plan of record is `docs/ROADMAP.md` (milestones M1 to M8). The list below is the
+older sketch, kept for the ideas in it:
 
 1. **Playtest and tune** (next): human play, adjust the numbers above.
 2. **Juice**: window open/close animation, imp squash on arrival, crash screen flicker,
