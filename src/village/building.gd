@@ -4,6 +4,8 @@ extends Node2D
 
 var id := ""
 var def: Dictionary
+var cell := Vector2i(-1, -1)
+var price_paid := 0
 var _t := 0.0
 
 # dojo state (drawn as a sign and a progress bar)

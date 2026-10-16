@@ -14,17 +14,19 @@ const DEFS := {
 	},
 	"dojo": {
 		"name": "Imp Dojo",
-		"desc": "Trains two of the imps you already have: they walk in, train for 6 s, and come out completing pop-ups for the full reward.",
+		"desc": "Trains two imps from huts within 2 cells: they walk in, train for 6 s, and come out completing pop-ups for the full reward.",
 		"cost": 50,
 		"max": 6,
 		"color": Color("b22222"),
+		"radius": 2,
 	},
 	"coffee": {
 		"name": "Coffee Cart",
-		"desc": "All imps move 25% faster.",
+		"desc": "Imps from huts within 2 cells move 25% faster (carts stack).",
 		"cost": 40,
 		"max": 4,
 		"color": Color("6f4e37"),
+		"radius": 2,
 	},
 	"ram": {
 		"name": "RAM Stick",
@@ -35,10 +37,11 @@ const DEFS := {
 	},
 	"firewall": {
 		"name": "Firewall",
-		"desc": "Pop-ups spawn 15% slower.",
+		"desc": "No pop-up spawns within 3 cells of it. Put it where the windows hurt most.",
 		"cost": 70,
 		"max": 3,
 		"color": Color("ff8c00"),
+		"radius": 3,
 	},
 	"antivirus": {
 		"name": "Antivirus Shrine",
@@ -101,3 +104,18 @@ static func cost(id: String, owned: int, mult: float = 1.0) -> int:
 
 static func max_count(id: String) -> int:
 	return Tuning.inum("building.%s.max" % id, int(DEFS[id]["max"]))
+
+
+## Effect radius in cells (0 = global).
+static func radius(id: String) -> int:
+	return Tuning.inum("building.%s.radius" % id, int(DEFS[id].get("radius", 0)))
+
+
+const REFUND := 0.5
+const REFUND_ON_BREAK := 0.75
+
+
+## Bytes returned when a building is demolished: half what was paid, three
+## quarters during a coffee break.
+static func refund(price_paid: int, in_break: bool) -> int:
+	return int(floor(price_paid * (REFUND_ON_BREAK if in_break else REFUND)))
