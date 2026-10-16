@@ -110,6 +110,43 @@ func _ready() -> void:
 			_start_break()
 		"place":
 			_begin_place("hut")
+		"gallery0", "gallery1", "gallery2":
+			_gallery(int(str(Game.dev["ui"]).substr(7)))
+
+
+## Dev: lay out one of each pop-up type on a grid with the spawner off, for
+## visual review. Page 2 shows the multi-step types advanced to their later pages.
+func _gallery(page: int) -> void:
+	spawner.active = false
+	var ids: Array[String] = []
+	for id: String in PopupCatalog.DEFS.keys():
+		ids.append(id)
+	ids.sort()
+	var chosen: Array[String] = []
+	if page == 2:
+		chosen = ["cookie", "toolbar", "leak", "update", "captcha", "chat"]
+	else:
+		for i in range(ids.size()):
+			if i / 6 == page:
+				chosen.append(ids[i])
+	run.unlocked_popups = ["clock_out", "hundred_closed", "dojo_built"]
+	for i in range(chosen.size()):
+		var p := spawner.spawn(chosen[i])
+		p.position = Vector2(12 + (i % 3) * 424, 12 + (i / 3) * 340)
+		if page == 2:
+			var c: Node = p.content_node
+			match chosen[i]:
+				"cookie", "toolbar":
+					c.call("_goto", 1)
+				"leak":
+					c.call("_advance")
+				"update":
+					c.set("_installing", true)
+					c.get("_bar").visible = true
+				"captcha":
+					c.get("_hint").text = "Incorrect. Try again."
+				"chat":
+					c.get("_input").text = "help me"
 	_banner("HOUR 1", Color("ffd700"))
 
 
