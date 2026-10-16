@@ -95,7 +95,7 @@ pushed outside the nearest ring). The bots place through `Village.suggest_cell(i
 (carts and dojos where they cover the most huts, firewalls spread out near the centre).
 Step two (adjacency) is still open.
 
-## 3. Recycle Bin: drag a pop-up to delete it
+## 3. Recycle Bin: drag a pop-up to delete it — DONE 2026-10-16
 
 **Verdict.** Good: small, thematic, and it gives dragging a purpose. It must not be a free
 cookie counter.
@@ -109,6 +109,11 @@ capacity, not an exploit. Imps cannot use it.
 **Implementation.** `WindowFrame` emits `drag_ended(global_pos)`; `Desktop` checks the
 bin icon's rect; `DesktopIcon` "bin" draws full/empty states and a count. Telemetry
 `recycled`. External policy gains `recycle:<id>` moves with the capacity in state.
+
+*Shipped as designed: `drag_moved`/`drag_ended` on `WindowFrame`, `RunState.recycle_popup`
+and `empty_bin` (pure, tested), the bin icon draws sheets, a count and the emptying bar,
+telemetry `recycled` and `bin_emptied`, the `crunch` sound, and `recycle:<id>` /
+`empty_bin` external-policy moves (greedy and random never recycle).*
 
 ## 4. Minimise to the taskbar
 

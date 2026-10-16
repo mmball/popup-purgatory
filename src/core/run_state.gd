@@ -89,6 +89,11 @@ var buildings_list: Array[String] = []   ## building ids in build order
 var upgrades_picked: Array[String] = []  ## upgrade ids in pick order
 var wave_log: Array[Dictionary] = []     ## one snapshot per completed wave
 
+# --- recycle bin: drag a pop-up in to delete it, no reward, no penalty ---
+const BIN_CAPACITY := 3
+var bin_items := 0           ## windows in the bin; a full bin refuses drops until emptied
+var popups_recycled := 0     ## never counted as closed or completed
+
 
 ## Snapshot the run at the end of a wave (called when the break begins).
 func log_wave_end(imps: int, trained: int) -> void:
@@ -110,6 +115,7 @@ func summary() -> Dictionary:
 		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log, "tune": Tuning.spec,
 		"tier": tier, "won": won, "overtime": overtime, "banked_score": banked_score,
 		"final_score": final_score(), "best_streak": best_streak,
+		"bin_items": bin_items, "popups_recycled": popups_recycled,
 	}
 
 
@@ -299,3 +305,23 @@ func crash(reason: String) -> void:
 	crashed_flag = true
 	crash_reason = reason
 	crashed.emit(reason)
+
+
+# ---------- recycle bin ----------
+
+func bin_has_room() -> bool:
+	return bin_items < Tuning.inum("run.bin_capacity", BIN_CAPACITY)
+
+
+## A pop-up was dropped into the bin: its RAM is freed like a normal close, but
+## nothing is rewarded and nothing counts as closed, completed or a streak.
+func recycle_popup(ram_cost: int) -> void:
+	assert(bin_has_room(), "recycle_popup: the bin is full; check bin_has_room() first")
+	ram_used = maxi(0, ram_used - ram_cost)
+	popups_recycled += 1
+	bin_items += 1
+	ram_changed.emit(ram_used, ram_max)
+
+
+func empty_bin() -> void:
+	bin_items = 0

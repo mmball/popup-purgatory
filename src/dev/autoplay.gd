@@ -196,6 +196,10 @@ func _external_state(desktop: Desktop) -> Dictionary:
 				moves.append({"id": "dismiss:%d" % pid, "kind": "dismiss", "popup": pid, "desc": "X the %s (+%d bytes)" % [p.type_id, entry["dismiss_reward"]]})
 			if _completion_control(p) != null:
 				moves.append({"id": "complete:%d" % pid, "kind": "complete", "popup": pid, "desc": "complete the %s in one click (+%d bytes)" % [p.type_id, entry["complete_reward"]]})
+			if run.bin_has_room() and not desktop._bin_emptying:
+				moves.append({"id": "recycle:%d" % pid, "kind": "recycle", "popup": pid, "desc": "drag the %s to the Recycle Bin (no reward, frees %d RAM)" % [p.type_id, p.ram_cost]})
+		if run.bin_items > 0 and not desktop._bin_emptying:
+			moves.append({"id": "empty_bin", "kind": "empty_bin", "desc": "empty the Recycle Bin (takes 2 s; drops are refused meanwhile)"})
 		for id: String in BuildingCatalog.available(run.unlocked_buildings):
 			var owned := desktop.village.count(id)
 			var cost := desktop.building_cost(id, owned)
@@ -218,6 +222,7 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		"bytes": run.bytes, "score": run.score, "ram_used": run.ram_used, "ram_max": run.ram_max,
 		"overloaded": run.overloaded, "imps": desktop.imp_manager.imps.size(), "trained": desktop.imp_manager.count_trained(),
 		"buildings": buildings, "owned_buildings": owned_buildings, "upgrades": run.upgrades_picked, "popups": popups, "legal_moves": moves,
+		"bin": {"items": run.bin_items, "capacity": Tuning.inum("run.bin_capacity", RunState.BIN_CAPACITY), "emptying": desktop._bin_emptying},
 	}
 
 
@@ -281,6 +286,12 @@ func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> vo
 			var xy := parts[1].split(",")
 			if xy.size() == 2:
 				desktop.demolish(Vector2i(int(xy[0]), int(xy[1])))
+		"recycle":
+			var p := instance_from_id(int(parts[1])) as PopupBase
+			if p != null and not p.is_closing:
+				desktop._on_popup_dropped(p, desktop.village.bin_rect().get_center())
+		"empty_bin":
+			desktop.empty_bin()
 		"pick":
 			for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
 				var card := b.get_parent().get_parent()

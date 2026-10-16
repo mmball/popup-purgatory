@@ -5,6 +5,8 @@ extends Control
 
 signal close_requested
 signal raised
+signal drag_moved(global_pos: Vector2)   ## a title-bar drag moved; global mouse position
+signal drag_ended(global_pos: Vector2)   ## released after a title-bar drag; global mouse position
 
 const TITLE_H := 18
 const BORDER := 3
@@ -30,6 +32,7 @@ var content: MarginContainer
 
 var _dragging := false
 var _drag_offset := Vector2.ZERO
+var _drag_moved := false   ## the current press moved the window (a click alone is not a drag)
 
 
 func _init() -> void:
@@ -142,15 +145,22 @@ func _on_title_input(event: InputEvent) -> void:
 				raise()
 				if draggable:
 					_dragging = true
+					_drag_moved = false
 					_drag_offset = get_global_mouse_position() - global_position
 			else:
+				var was_drag := _dragging and _drag_moved
 				_dragging = false
+				_drag_moved = false
+				if was_drag:
+					drag_ended.emit(get_global_mouse_position())
 	elif event is InputEventMouseMotion and _dragging:
 		var target := get_global_mouse_position() - _drag_offset
 		if drag_bounds.size != Vector2.ZERO:
 			target.x = clampf(target.x, drag_bounds.position.x, drag_bounds.end.x - size.x)
 			target.y = clampf(target.y, drag_bounds.position.y, drag_bounds.end.y - size.y)
 		global_position = target.round()
+		_drag_moved = true
+		drag_moved.emit(get_global_mouse_position())
 
 
 ## Centers this window inside its parent control.

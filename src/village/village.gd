@@ -47,6 +47,23 @@ func deselect_icons() -> void:
 		i.deselect()
 
 
+## The Recycle Bin icon (drop target for pop-ups).
+func bin_icon() -> DesktopIcon:
+	for i: DesktopIcon in _icons:
+		if i.kind == "bin":
+			return i
+	push_error("Village: no Recycle Bin icon")
+	return null
+
+
+## Global rect of the Recycle Bin icon, for hit-testing a dropped window.
+func bin_rect() -> Rect2:
+	var icon := bin_icon()
+	if icon == null:
+		return Rect2()
+	return Rect2(icon.global_position, icon.size)
+
+
 func is_placing() -> bool:
 	return placing_id != ""
 

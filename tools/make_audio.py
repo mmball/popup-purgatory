@@ -176,6 +176,21 @@ def typewriter():
                     noise(0.015, 7) * env(0.015, 0.001, 0.005, 0.0, 0.01) * 0.5), 0.4)
 
 
+def crunch():
+    # Paper crumple for "Empty Recycle Bin": 0.35 s of band-passed noise (a light
+    # low-pass minus a heavy one leaves the papery mid band) with a few crackle
+    # transients at fixed offsets.
+    dur = 0.35
+    n = noise(dur, 17)
+    body = (lowpass(n, 0.45) - lowpass(n, 0.08)) * env(dur, 0.01, 0.12, 0.5, 0.15)
+    out = body * 0.7
+    for at, length, seed in [(0.03, 0.012, 21), (0.09, 0.008, 22), (0.14, 0.015, 23), (0.21, 0.01, 24), (0.27, 0.012, 25)]:
+        crack = noise(length, seed) * env(length, 0.0005, 0.004, 0.2, 0.005)
+        start = int(SR * at)
+        out[start:start + len(crack)] += crack * 1.2
+    return norm(out, 0.55)
+
+
 # ---------- music ----------
 
 NOTE = {n: i for i, n in enumerate(["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"])}
@@ -267,7 +282,8 @@ def main():
     os.makedirs(f"{out}/music", exist_ok=True)
     for name, fn in [("click", click), ("chime", chime), ("chime_big", chime_big), ("error", error),
                      ("multiply", multiply), ("hop", hop), ("rise", rise), ("warn", warn), ("crash", crash),
-                     ("fanfare", fanfare), ("shutdown", shutdown), ("dialup", dialup), ("typewriter", typewriter)]:
+                     ("fanfare", fanfare), ("shutdown", shutdown), ("dialup", dialup), ("typewriter", typewriter),
+                     ("crunch", crunch)]:
         write_ogg(f"{out}/sfx/{name}.ogg", fn())
     write_ogg(f"{out}/music/desk.ogg", music_desk(), loop=True)
     write_ogg(f"{out}/music/menu.ogg", music_menu(), loop=True)

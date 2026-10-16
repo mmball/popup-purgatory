@@ -50,10 +50,13 @@ Written by `Telemetry` for every run, bot or human. Every row has
 | train_done | imp, trained_total | it comes out trained (6 s later) |
 | demolish | id, cell, refund, bytes_after, owned_after | building sold (hut: its imp leaves) |
 | relocate | id, from, to | building dragged to a new cell during a break |
+| recycled | type, age, ram_used, bin_items | pop-up dropped into the Recycle Bin (no reward, RAM freed) |
+| bin_emptied | (none) | "Empty Recycle Bin" finished, 2 s after the double-click |
 | run_end | reason + `RunState.summary()` minus waves | run over |
 
 `popup_closed` also carries `streak` (manual completion streak after the close). Run rows
-carry `banked_score`, `final_score` and `best_streak`.
+carry `banked_score`, `final_score` and `best_streak`, plus `bin_items` (windows in the
+Recycle Bin at the end) and `popups_recycled` (never counted in `closed`).
 
 ## Rules
 

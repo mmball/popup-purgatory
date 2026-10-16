@@ -151,6 +151,22 @@ while placing and while the Start menu is open. The other buildings stay global.
 - Relocate: during a break only, drag a building to a free cell for free. A moved hut
   takes its imp's home with it. Firewall rings and cart coverage follow the building.
 
+### Recycle Bin
+
+- Drag any pop-up over the Recycle Bin icon (the icon tints while a window hovers it)
+  and release: the window is deleted with no reward and no penalty. No bytes, no cookie
+  spawn, no remind-later, no timeout consequence, streak untouched; its RAM is freed
+  like a normal close. It never counts as closed or completed (run rows carry
+  `popups_recycled` and `bin_items` separately).
+- Capacity three. The icon shows one crumpled sheet per item and an "n/3" count; a fourth
+  drop is refused ("Recycle Bin is full") and the window is nudged 40 px off the icon.
+- "Empty Recycle Bin": double-click the icon. It takes 2 s of game time (a bar fills
+  under the icon; drops are refused meanwhile; paused by a break), then the bin is
+  clear and the paper-crunch sound plays.
+- Imps never use it. The bots: greedy and random never recycle; the external policy
+  gets `recycle:<id>` and `empty_bin` moves with the capacity in state, and the
+  heuristic driver recycles a cookie banner only above 85% RAM.
+
 ## Upgrades (coffee break, pick 1 of 3)
 
 Bigger X Buttons, Memory Upgrade (+24 RAM), Espresso Shots (imp speed), Quick Hands (imp

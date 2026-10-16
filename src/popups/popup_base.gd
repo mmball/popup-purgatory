@@ -138,6 +138,18 @@ func _close(completed: bool, by_imp: bool) -> void:
 	closed.emit(self, completed, by_imp)
 
 
+## Dropped into the Recycle Bin: the window goes away with no reward and no
+## penalty, so `closed` is never emitted (Desktop handles RAM and the imps).
+## State changes first; the fold-away is cosmetic.
+func recycle() -> void:
+	if is_closing:
+		return
+	is_closing = true
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	close_button.disabled = true
+	Juice.pop_out(self, queue_free)
+
+
 ## Where an imp stands to work on this window: the middle of the X button.
 func imp_close_point() -> Vector2:
 	return close_button.global_position + close_button.size * 0.5 + Vector2(0, 10)

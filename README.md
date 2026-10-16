@@ -23,6 +23,8 @@ Controls are mouse-first. **Start** button or **B** opens the build menu, **1-7*
 building directly, **Esc** cancels placement, right-click also cancels. Drag windows by
 their title bar. **Demolish...** in the Start menu (or **D**) sells a building (half price back,
 three quarters during a break); during a break you can also drag buildings to new cells.
+Drag a pop-up onto the **Recycle Bin** to delete it for no reward and no penalty (it holds
+three; double-click the icon to empty it, which takes 2 seconds).
 
 The full design is in [`docs/DESIGN.md`](docs/DESIGN.md); the plan to a published game is
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the next gameplay features, each with a verdict and an

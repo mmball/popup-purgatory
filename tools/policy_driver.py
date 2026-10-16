@@ -43,6 +43,7 @@ How the game works:
 - The run is one workday of 8 waves; survive wave 8 and you clock out (a win). After that, overtime is endless.
 - Bytes buy buildings. Imp Huts hire imps who walk to pop-ups and dismiss them for you; an Imp Dojo trains two imps from huts within 2 cells to complete instead; RAM Sticks raise ram_max; Coffee Carts speed imps from huts within 2 cells; nothing spawns within 3 cells of a Firewall; the Antivirus Shrine stops timeouts from multiplying; the Pointer Shrine pays +1 per pop-up you close yourself. Building prices rise with each copy. The bot places each building where its radius helps most.
 - A "sell" move demolishes one of your buildings for a refund (half its price, three quarters during a break); owned_buildings lists what you have.
+- A "recycle" move drags a pop-up to the Recycle Bin: it vanishes with no reward and no penalty (a recycled cookie banner spawns nothing), freeing its RAM. The bin holds bin.capacity windows; "empty_bin" clears it but takes 2 seconds, during which nothing can be dropped. It is an emergency valve, not a free X.
 - Between waves you pick one of three upgrades.
 - Spending bytes never lowers your score (score = total bytes earned), so build whenever it helps.
 Strategy hints: keep ram_used comfortably under ram_max; prefer complete over dismiss when RAM is safe; buy huts early; when nothing is urgent, choose "wait"."""
@@ -75,6 +76,17 @@ def heuristic(state):
         return picks[0]["id"], "first upgrade"
     pressure = state["ram_used"] / max(1, state["ram_max"])
     popups = state["popups"]
+    bin_state = state.get("bin", {"items": 0, "capacity": 0})
+    # 0. emergency valve: above 85% RAM, recycle a cookie banner (X-ing it would
+    #    spawn more) while the bin has room; empty the bin only when it is full
+    if pressure > 0.85:
+        if bin_state["items"] < bin_state["capacity"]:
+            for p in sorted(popups, key=lambda p: -p["ram_cost"]):
+                mid = f"recycle:{p['id']}"
+                if p.get("dismiss_spawns") and mid in moves:
+                    return mid, f"recycle cookie banner at ram {pressure:.2f}"
+        elif "empty_bin" in moves:
+            return "empty_bin", f"bin full at ram {pressure:.2f}"
     # 1. anything about to multiply or escalate
     urgent = [p for p in popups if p["lifetime"] > 0 and p["timeout_kind"] != "none" and p["lifetime"] - p["age_since_timeout"] < 4.0]
     for p in sorted(urgent, key=lambda p: p["lifetime"] - p["age_since_timeout"]):

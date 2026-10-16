@@ -248,6 +248,7 @@ func _process(delta: float) -> void:
 	if Game.dev.has("max_seconds") and run.elapsed >= float(Game.dev["max_seconds"]):
 		_end("MAX_SECONDS")
 		return
+	_tick_bin(delta)
 	taskbar.update_from(run, imp_manager.imps.size(), imp_manager.count_trained())
 
 
@@ -261,6 +262,8 @@ func _wire_popup(popup: PopupBase) -> void:
 	popup.hopped.connect(func(p: PopupBase) -> void:
 		_log("hop", {"type": p.type_id})
 		_float("nope!", p.global_position + Vector2(p.size.x * 0.5, 10), Color("ff6060"), 12))
+	popup.drag_moved.connect(func(pos: Vector2) -> void: _on_popup_drag_moved(popup, pos))
+	popup.drag_ended.connect(func(pos: Vector2) -> void: _on_popup_dropped(popup, pos))
 	_log("popup_spawned", {"type": popup.type_id, "ram_cost": popup.ram_cost, "clustered": popup.spawned_near, "ram_used": run.ram_used})
 
 
@@ -629,7 +632,76 @@ func _on_icon_activated(kind: String) -> void:
 		"computer":
 			_float("RAM %d/%d  Imps %d  Score %d" % [run.ram_used, run.ram_max, imp_manager.imps.size(), run.score], Vector2(640, 200), Color.WHITE, 14)
 		"bin":
-			_float("Nothing to recycle. Yet.", Vector2(640, 200), Color.WHITE, 14)
+			if run.bin_items > 0:
+				empty_bin()
+			else:
+				_float("Nothing to recycle. Yet.", Vector2(640, 200), Color.WHITE, 14)
+
+
+# ---------- recycle bin ----------
+## Drag a pop-up onto the Recycle Bin icon to delete it: no reward, no penalty
+## (no cookie spawn, no remind-later, no streak change), RAM freed. The bin holds
+## RunState.BIN_CAPACITY windows; "Empty Recycle Bin" (double-click the icon)
+## takes BIN_EMPTY_SECONDS of game time. Imps never use it.
+
+const BIN_EMPTY_SECONDS := 2.0
+
+var _bin_emptying := false
+var _bin_empty_t := 0.0
+
+
+func _on_popup_drag_moved(popup: PopupBase, pos: Vector2) -> void:
+	village.bin_icon().highlight = not popup.is_closing and village.bin_rect().has_point(pos)
+
+
+## A pop-up was released after a drag. Public: the bot's external policy calls it
+## with the bin centre instead of simulating a drag. Returns true when recycled.
+func _on_popup_dropped(popup: PopupBase, pos: Vector2) -> bool:
+	village.bin_icon().highlight = false
+	if _ended or popup.is_closing or not village.bin_rect().has_point(pos):
+		return false
+	var at := popup.global_position + Vector2(popup.size.x * 0.5, 10)
+	if _bin_emptying or not run.bin_has_room():
+		_float("Recycle Bin is emptying..." if _bin_emptying else "Recycle Bin is full", at, Color("ff6060"), 13)
+		popup.global_position.x += 40.0  # off the icon so the next drag starts clean
+		return false
+	run.recycle_popup(popup.ram_cost)
+	imp_manager.on_popup_closed(popup)
+	popup.recycle()
+	village.bin_icon().bin_items = run.bin_items
+	_log("recycled", {"type": popup.type_id, "age": snappedf(popup.total_age, 0.01), "ram_used": run.ram_used, "bin_items": run.bin_items})
+	_float("recycled", at, Color("c0c0c0"), 12)
+	Sfx.play("click", 0.7)
+	return true
+
+
+## Starts "Empty Recycle Bin" (double-click, or the bot). Returns false if there
+## is nothing to empty or it is already running.
+func empty_bin() -> bool:
+	if _ended or _bin_emptying or run.bin_items <= 0:
+		return false
+	_bin_emptying = true
+	_bin_empty_t = 0.0
+	village.bin_icon().emptying = 0.001  # the bar appears at once
+	_float("Emptying Recycle Bin...", Vector2(640, 200), Color.WHITE, 13)
+	return true
+
+
+func _tick_bin(delta: float) -> void:
+	if not _bin_emptying or run.in_break:
+		return
+	_bin_empty_t += delta
+	var icon := village.bin_icon()
+	icon.emptying = clampf(_bin_empty_t / BIN_EMPTY_SECONDS, 0.001, 1.0)
+	if _bin_empty_t < BIN_EMPTY_SECONDS:
+		return
+	_bin_emptying = false
+	run.empty_bin()
+	icon.bin_items = 0
+	icon.emptying = 0.0
+	_log("bin_emptied", {})
+	_float("Recycle Bin emptied", Vector2(640, 200), Color.WHITE, 13)
+	Sfx.play("crunch", 1.0, 0.0, 0.0)
 
 
 # ---------- ending ----------
