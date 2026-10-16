@@ -39,7 +39,7 @@ Written by `Telemetry` for every run, bot or human. Every row has
 | popup_spawned | type, ram_cost, clustered (bool), ram_used | a window appears |
 | popup_closed | type, completed, by_imp, age, reward, ram_used | a window closes with reward |
 | popup_timeout | type, kind, timeouts | lifetime elapsed (multiply/spawn/escalate) |
-| trap | type, kind | player fell for a dark pattern |
+| trap | type, kind | player fell for a dark pattern (type `boss`: an installer trap, kinds bundled/bad_key/cancel/browser/newsletter/restart) |
 | remind_later | type | update dismissed without reward, requeued |
 | build | id, cell, cost, bytes_after, owned_after | building placed |
 | wave_end | snapshot fields (as above) | break begins |
@@ -55,6 +55,9 @@ Written by `Telemetry` for every run, bot or human. Every row has
 | ability | id (+ type for alt_f4, ends for task_manager) | a chord or tray icon was used |
 | task_ended | type, ends_left | End Task closed a window from the Task Manager |
 | freeze | held, reset (bool) | a Ctrl+Alt+Del freeze ended (reset: it was held past the limit) |
+| boss_start | wave, trained | the Service Pack installer opened (waves 4 and 8) |
+| boss_step | step, by_imp | an installer page was finished (by the player or a trained imp) |
+| boss_end | wave, won, steps, seconds, reward | the installer closed (won: all pages in time) |
 | run_end | reason + `RunState.summary()` minus waves | run over |
 
 `popup_closed` also carries `streak` (manual completion streak after the close). Run rows

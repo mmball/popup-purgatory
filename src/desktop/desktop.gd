@@ -28,6 +28,8 @@ var _rise_timer := 0.0
 var _wave_score_start := 0
 var _shake_rng := RandomNumberGenerator.new()  # cosmetic only; seeded so screenshots are stable
 var task_manager: TaskManager       ## open Task Manager window, or null
+var boss: BossWindow                ## the Service Pack installer while it is up, or null
+var _boss_pick := false             ## the break dialog is showing the boss's free pick
 var _freeze_overlay: Control        ## dimmer shown while Ctrl+Alt+Del is held
 var _freeze_auto := -1.0            ## bots: release the freeze after this many seconds
 
@@ -136,6 +138,8 @@ func _ready() -> void:
 		"freeze":
 			use_ability("ctrl_alt_del")
 			freeze_for(2.0)
+		"boss":
+			_dev_show_boss()
 
 
 ## Dev: lay out one of each pop-up type on a grid with the spawner off, for
@@ -447,6 +451,11 @@ func _find_button(root: Node, label: String) -> Win98Button:
 
 
 func _start_break() -> void:
+	if _boss_pick:
+		# The installer's bonus was never picked this hour: it expires with the hour.
+		_boss_pick = false
+		_log("upgrade_picked", {"id": "", "boss": true, "expired": true})
+		_float("Setup bonus expired", Vector2(640, 230), Color("ff6060"), 13)
 	run.log_wave_end(imp_manager.imps.size(), imp_manager.count_trained())
 	_log("wave_end", run.wave_log[run.wave_log.size() - 1])
 	run.begin_break()
@@ -471,7 +480,7 @@ func _start_break() -> void:
 
 func _on_upgrade_chosen(id: String) -> void:
 	run.upgrades_picked.append(id)
-	_log("upgrade_picked", {"id": id})
+	_log("upgrade_picked", {"id": id, "boss": _boss_pick})
 	var effect := UpgradeCatalog.apply(id, run)
 	match effect:
 		"spawn_imp":
@@ -481,9 +490,103 @@ func _on_upgrade_chosen(id: String) -> void:
 				if p is PopupBase:
 					p.set_close_button_size(run.close_button_size)
 	break_dialog.visible = false
+	if _boss_pick:
+		# The installer's bonus card: the hour is already running, nothing else changes.
+		_boss_pick = false
+		return
 	run.end_break()
 	village.set_relocate_enabled(false)
-	_banner("HOUR %d" % run.wave, Color("ffd700"))
+	if RunState.is_boss_wave(run.wave) and not run.overtime:
+		_start_boss()
+	else:
+		_banner("HOUR %d" % run.wave, Color("ffd700"))
+
+
+# ---------- bosses (docs/FEATURES.md item 9) ----------
+
+## Noon and 4 PM open with a Service Pack install: a ten-page installer the
+## whole desk works on. Spawns and the hour hold until it closes; the windows
+## already open keep living, so the imps have work either way. Trained imps
+## each take one page. Win: BOSS_REWARD bytes and a free upgrade pick. Lose
+## (time runs out): three error windows and nothing else.
+func _start_boss() -> void:
+	run.start_boss()
+	spawner.active = false
+	boss = BossWindow.new()
+	boss.setup(run, rng)
+	add_child(boss)
+	boss.center_in_parent()
+	move_child(boss, taskbar.get_index())
+	imp_manager.set_boss(boss)
+	boss.step_done.connect(func(step: int, by_imp: bool) -> void:
+		_log("boss_step", {"step": step, "by_imp": by_imp})
+		_float("step %d/%d" % [step, BossWindow.STEPS], boss.global_position + Vector2(boss.size.x * 0.5, -6), Color("7CFC00") if by_imp else Color.WHITE, 12))
+	boss.misclick.connect(_on_boss_misclick)
+	boss.finished.connect(_end_boss)
+	_log("boss_start", {"wave": run.wave, "trained": imp_manager.count_trained()})
+	_banner("%s: SERVICE PACK" % ("12:00 PM" if run.wave == RunState.BOSS_WAVES[0] else "4:00 PM"), Color("ffd700"))
+	Sfx.play("dialup", 0.9)
+
+
+func _on_boss_misclick(kind: String) -> void:
+	_log("trap", {"type": "boss", "kind": kind})
+	var near: Vector2 = boss.global_position + boss.size * 0.5
+	spawner.spawn("ad", near)
+	_float("setup says no", near + Vector2(0, -30), Color("ff6060"), 13)
+	Sfx.play("error", 1.0)
+	Juice.add_trauma(self, 0.25)
+
+
+func _end_boss(won: bool) -> void:
+	if boss == null:
+		return
+	var b := boss
+	boss = null
+	imp_manager.clear_boss()
+	var reward := run.end_boss(won)
+	spawner.active = true  # the hour starts either way; the bonus pick floats over it
+	_log("boss_end", {"wave": run.wave, "won": won, "steps": b.done, "seconds": snappedf(BossWindow.TIME_LIMIT - b.time_left, 0.1), "reward": reward})
+	var tw := create_tween()
+	tw.tween_interval(1.4)
+	tw.tween_callback(func() -> void: Juice.pop_out(b, b.queue_free))
+	if won:
+		_float("+%d" % reward, b.global_position + Vector2(b.size.x * 0.5, 40), Color("ffd700"), 30)
+		_banner("SERVICE PACK INSTALLED", Color("ffd700"))
+		Sfx.play("fanfare", 1.0, 2.0, 0.0)
+		_offer_boss_pick()
+	else:
+		_banner("SETUP FAILED", Color("ff6060"))
+		Sfx.play("multiply", 0.8)
+		for i in range(3):
+			spawner.spawn("error", b.global_position + b.size * 0.5)
+
+
+## The installer's bonus: pick one of three upgrades, counters to the unlocked
+## pop-ups first (the ones that gate on an achievement), then anything eligible.
+func _offer_boss_pick() -> void:
+	var pool := UpgradeCatalog.eligible(run)
+	var counters: Array[String] = []
+	var rest: Array[String] = []
+	for id: String in pool:
+		if UpgradeCatalog.DEFS[id].has("unlock"):
+			counters.append(id)
+		else:
+			rest.append(id)
+	var choices: Array[Dictionary] = []
+	while choices.size() < 3 and (counters.size() > 0 or rest.size() > 0):
+		var from := counters if counters.size() > 0 else rest
+		var i := rng.randi_range(0, from.size() - 1)
+		choices.append(UpgradeCatalog.get_def(from[i]))
+		from.remove_at(i)
+	if choices.is_empty():
+		return
+	var offered: Array[String] = []
+	for c: Dictionary in choices:
+		offered.append(str(c["id"]))
+	_log("upgrade_offered", {"ids": offered, "boss": true})
+	_boss_pick = true
+	break_dialog.show_choices(run.wave, choices, "Service Pack 98 installed. Setup found a bonus. Pick one:")
+	break_dialog.center_in_parent()
 
 
 # ---------- building ----------
@@ -778,6 +881,9 @@ func _end(reason: String) -> void:
 	set_process(false)
 	spawner.active = false
 	_close_task_manager()
+	if boss != null:
+		boss.queue_free()
+		boss = null
 	village.cancel_demolish()
 	village.set_relocate_enabled(false)
 	run.crash_reason = reason
@@ -954,6 +1060,15 @@ func _end_freeze() -> void:
 	_log("freeze", {"held": snappedf(held, 0.01), "reset": run.crashed_flag})
 	_freeze_overlay.queue_free()
 	_freeze_overlay = null
+
+
+## Dev: show the Service Pack boss window for a render check (`--ui=boss`).
+func _dev_show_boss() -> void:
+	var boss := BossWindow.new()
+	boss.setup(run, rng)
+	add_child(boss)
+	boss.center_in_parent()
+	move_child(boss, taskbar.get_index())
 
 
 # ---------- helpers ----------

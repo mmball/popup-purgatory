@@ -194,6 +194,26 @@ per pick; Admin Rights raises its ends to five. Cooldowns are tunable as
 key: the external policy's `ability:ctrl_alt_del` releases after 4 s; greedy opens Task
 Manager above 80% RAM and clicks End Task until the uses run out.
 
+## Bosses: the Service Pack install (12 PM and 4 PM)
+
+Waves 4 and 8 open with a boss instead of a banner: a full Win98 installer, "Service
+Pack 98 Setup", ten pages the whole desk works on while normal spawns and the hour's
+clock hold (windows already open keep living, so imps have work either way, and RAM
+overload still crashes). The pages are the genre's greatest hits: a license box to
+tick, bundled toolbars to untick, a product key to type, a copy bar to wait on, a tiny
+"continue" link beside a big "Cancel setup" trap, a default-browser radio, a newsletter,
+and "Restart now" (the trap) versus "Restart later". Every trap spawns an ad and shakes
+the screen; none of them end the install. Trained imps each take one page (three
+seconds of work, two imps on it at a time), so a trained town shortens the boss.
+
+| outcome | what happens |
+| --- | --- |
+| all ten pages inside 75 s | +60 bytes, "SERVICE PACK INSTALLED", and a free pick of three upgrades: counters to the unlocked pop-ups first, then anything eligible |
+| the timer runs out | "SETUP FAILED", three error windows, nothing else; the hour starts |
+
+No bosses in overtime. `boss.reward` and `imp.boss_step_time` are Tuning keys; the
+page count and time limit are constants on BossWindow.
+
 ## Meta-progression
 
 Lifetime bytes go into a bank. Perks bought once from the main menu: Company Imp (start

@@ -63,6 +63,13 @@ var frozen := false
 var freeze_time := 0.0            ## seconds the current freeze has been held
 var abilities_used := {}          ## id -> times used this run
 
+# --- bosses: the Service Pack install at noon and 4 PM (waves 4 and 8) ---
+const BOSS_WAVES: Array[int] = [4, 8]
+const BOSS_REWARD := 60
+var boss_active := false        ## the installer is up: spawns and the wave clock hold
+var bosses_won := 0
+var bosses_failed := 0
+
 # --- content pools unlocked for this run (ids); empty means catalog default ---
 var unlocked_popups: Array[String] = []
 var unlocked_buildings: Array[String] = []
@@ -133,6 +140,7 @@ func summary() -> Dictionary:
 		"tier": tier, "won": won, "overtime": overtime, "banked_score": banked_score,
 		"final_score": final_score(), "best_streak": best_streak,
 		"bin_items": bin_items, "popups_recycled": popups_recycled, "abilities": abilities_used,
+		"bosses_won": bosses_won, "bosses_failed": bosses_failed,
 	}
 
 
@@ -194,10 +202,36 @@ func tick(delta: float) -> void:
 			end_freeze()
 			crash("RESET")
 		return
-	wave_time_left = maxf(0.0, wave_time_left - delta)
+	if not boss_active:
+		wave_time_left = maxf(0.0, wave_time_left - delta)  # the hour waits for the installer
 	for id: String in ability_cooldowns.keys():
 		ability_cooldowns[id] = maxf(0.0, float(ability_cooldowns[id]) - delta)
 	_check_overload(delta)
+
+
+# ---------- bosses ----------
+
+## Waves that open with a Service Pack install (never in overtime).
+static func is_boss_wave(w: int) -> bool:
+	return w in BOSS_WAVES
+
+
+func start_boss() -> void:
+	assert(not boss_active, "boss already active")
+	boss_active = true
+
+
+## The installer closed: won pays BOSS_REWARD (Tuning boss.reward); the clock resumes.
+func end_boss(won: bool) -> int:
+	assert(boss_active, "no boss active")
+	boss_active = false
+	if won:
+		bosses_won += 1
+		var reward := Tuning.inum("boss.reward", BOSS_REWARD)
+		add_bytes(reward)
+		return reward
+	bosses_failed += 1
+	return 0
 
 
 # ---------- abilities ----------

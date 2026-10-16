@@ -171,7 +171,9 @@ func update_from(run: RunState, imp_count: int, trained: int) -> void:
 	var label := "Hour %d/%d" % [run.wave, RunState.WORKDAY_WAVES] if not run.overtime else "Overtime %d" % (run.wave - RunState.WORKDAY_WAVES)
 	if run.tier > 0:
 		label = "SP%d " % run.tier + label
-	if run.in_break:
+	if run.boss_active:
+		_wave.text = "%s  SETUP" % label
+	elif run.in_break:
 		_wave.text = "%s  break" % label
 	else:
 		var s := int(ceil(run.wave_time_left))

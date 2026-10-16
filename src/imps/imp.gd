@@ -3,10 +3,11 @@ extends Node2D
 ## A little worker. Idles near its home, walks to a pop-up, stands on its X
 ## button for a moment, then closes it. Trained imps complete instead of dismiss.
 
-enum State { IDLE, SEEK, WORK, TRAIN, LEAVE }
+enum State { IDLE, SEEK, WORK, TRAIN, LEAVE, BOSS }
 
 const BASE_SPEED := 90.0
 const DISMISS_TIME := 0.6
+const BOSS_STEP_TIME := 3.0   ## seconds a trained imp spends on one installer page
 const ARRIVE_DIST := 4.0
 const TRAIN_TIME := 6.0
 const XP_STEP := 0.02        ## speed per close
@@ -38,6 +39,8 @@ var _work_total := 1.0
 var hop_y := 0.0          ## animated by Juice.hop; added to the drawing offset
 var closes := 0           ## experience: each close speeds the imp up a little
 var dojo: Node2D          ## the dojo being walked to / trained in (TRAIN state)
+var boss: Node            ## the installer being worked on (BOSS state)
+var boss_step_done := false  ## each trained imp takes at most one page per boss
 var _train_left := 0.0
 var _alert_t := 0.0       ## seconds left to draw the "!" after acquiring a target
 var _sulk_t := 0.0        ## seconds left to draw the frown after being dodged
@@ -69,6 +72,8 @@ func leave() -> void:
 		target = null
 	elif state == State.TRAIN:
 		_clear_dojo()
+	elif state == State.BOSS:
+		_release_boss()
 	visible = true
 	state = State.LEAVE
 	var to_left := position.x
@@ -177,6 +182,8 @@ func _process(delta: float) -> void:
 			_train(delta)
 		State.LEAVE:
 			_leave(delta)
+		State.BOSS:
+			_boss(delta)
 	queue_redraw()
 
 
@@ -184,6 +191,11 @@ func _idle(delta: float) -> void:
 	_retarget_timer -= delta
 	if _retarget_timer <= 0.0:
 		_retarget_timer = 0.3
+		if trained and not boss_step_done:
+			var b: Node = manager.call("request_boss", self)
+			if b != null:
+				start_boss_step(b)
+				return
 		var t: PopupBase = manager.request_target(self)
 		if t != null:
 			target = t
@@ -249,6 +261,44 @@ func _work(delta: float) -> void:
 			t.dismiss(true)
 
 
+## Sent to the Service Pack installer (manager hands out the slots). The imp
+## walks to its corner, works BOSS_STEP_TIME, and completes one page.
+func start_boss_step(b: Node) -> void:
+	boss = b
+	state = State.BOSS
+	_work_left = -1.0  # walking; becomes the step time on arrival
+	_alert_t = 0.6
+
+
+func _release_boss() -> void:
+	if boss != null and is_instance_valid(boss):
+		boss.set("imps_working", maxi(0, int(boss.get("imps_working")) - 1))
+	boss = null
+
+
+func _boss(delta: float) -> void:
+	if boss == null or not is_instance_valid(boss) or bool(boss.call("is_finished")):
+		_release_boss()
+		state = State.IDLE
+		return
+	var dest: Vector2 = boss.call("imp_point")
+	if _work_left < 0.0:
+		if _move_toward(dest, speed(), delta) <= ARRIVE_DIST:
+			_work_total = Tuning.num("imp.boss_step_time", BOSS_STEP_TIME) * (run.imp_work_mult if run != null else 1.0)
+			_work_left = _work_total
+			Juice.squash(self)
+		return
+	position = dest
+	_work_left -= delta
+	if _work_left <= 0.0:
+		var b := boss
+		boss_step_done = true
+		_release_boss()
+		state = State.IDLE
+		Juice.hop(self)
+		b.call("imp_step")
+
+
 ## Moves toward `dest`; returns remaining distance.
 func _move_toward(dest: Vector2, px_per_s: float, delta: float) -> float:
 	var diff := dest - position
@@ -303,7 +353,7 @@ func _draw() -> void:
 		draw_rect(Rect2(bc + Vector2(-7, -15), Vector2(14, 3)), Color("222222"))
 		draw_rect(Rect2(bc + Vector2(-4, -18), Vector2(8, 3)), Color("222222"))
 		draw_line(bc + Vector2(7, -14), bc + Vector2(9, -9), Color("ffd700"), 1.0)
-	if state == State.WORK:
+	if state == State.WORK or state == State.BOSS:
 		var py := -24 + bob * 2.0
 		if trained:
 			# a little book: trained imps read the pop-up instead of just clicking

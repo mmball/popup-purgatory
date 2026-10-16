@@ -28,8 +28,8 @@ func _init() -> void:
 	box.add_child(_cards)
 
 
-func show_choices(wave: int, choices: Array[Dictionary]) -> void:
-	_intro.text = "Wave %d survived. The pop-ups are regrouping. Pick one upgrade:" % wave
+func show_choices(wave: int, choices: Array[Dictionary], intro: String = "") -> void:
+	_intro.text = intro if intro != "" else "Wave %d survived. The pop-ups are regrouping. Pick one upgrade:" % wave
 	for c: Node in _cards.get_children():
 		c.queue_free()
 	for def: Dictionary in choices:

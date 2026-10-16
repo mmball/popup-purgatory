@@ -16,6 +16,7 @@ var village: Village      ## set by Desktop; null in unit tests (no local effect
 var assigner := TargetAssigner.new()
 var imps: Array[Imp] = []
 var dojos: Array[Node2D] = []
+var boss: Node           ## the open Service Pack installer, or null
 
 const COLORS := [Color("8b2fc9"), Color("c93a2f"), Color("2f7fc9"), Color("2fa85a"), Color("d97f1f")]
 const COFFEE_SPEED := 1.25   ## per cart in range of the imp's hut (carts stack)
@@ -95,7 +96,7 @@ func pick_trainee(dojo: Node2D) -> Imp:
 	var best: Imp = null
 	var best_d := INF
 	for imp: Imp in imps:
-		if imp.trained or imp.state == Imp.State.TRAIN or imp.state == Imp.State.WORK or imp.state == Imp.State.LEAVE:
+		if imp.trained or imp.state == Imp.State.TRAIN or imp.state == Imp.State.WORK or imp.state == Imp.State.BOSS or imp.state == Imp.State.LEAVE:
 			continue
 		if imp.home_cell.x >= 0 and Village.cell_distance(imp.home_cell, dojo_cell) > radius:
 			continue
@@ -147,6 +148,31 @@ func _value(imp: Imp) -> int:
 ## A fired imp walked off the edge (idempotent; fire_imp already removed it).
 func on_imp_left(imp: Imp) -> void:
 	imps.erase(imp)
+
+
+## A Service Pack installer opened: every trained imp may take one page.
+func set_boss(b: Node) -> void:
+	boss = b
+	for imp: Imp in imps:
+		imp.boss_step_done = false
+
+
+func clear_boss() -> void:
+	boss = null
+
+
+## Hands `imp` an installer slot (IMP_SLOTS at a time, never more imps than
+## pages left), or null. Trained idle imps ask before taking a pop-up.
+func request_boss(imp: Imp) -> Node:
+	if boss == null or not is_instance_valid(boss) or bool(boss.call("is_finished")):
+		return null
+	if not imp.trained or imp.boss_step_done or imp.state != Imp.State.IDLE:
+		return null
+	var working := int(boss.get("imps_working"))
+	if working >= int(boss.get("IMP_SLOTS")) or int(boss.get("done")) + working >= int(boss.get("STEPS")):
+		return null
+	boss.set("imps_working", working + 1)
+	return boss
 
 
 func training_slots() -> int:

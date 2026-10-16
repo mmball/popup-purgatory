@@ -27,7 +27,9 @@ the desk for up to 5 s once an hour (hold longer and the machine resets); the tr
 do the same by mouse. **Demolish...** in the Start menu (or **D**) sells a building (half price back,
 three quarters during a break); during a break you can also drag buildings to new cells.
 Drag a pop-up onto the **Recycle Bin** to delete it for no reward and no penalty (it holds
-three; double-click the icon to empty it, which takes 2 seconds).
+three; double-click the icon to empty it, which takes 2 seconds). At **12 PM and 4 PM** a
+Service Pack installer takes over the desk: ten pages in 75 seconds, trained imps help,
+finishing pays and grants a free upgrade.
 
 The full design is in [`docs/DESIGN.md`](docs/DESIGN.md); the plan to a published game is
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the next gameplay features, each with a verdict and an

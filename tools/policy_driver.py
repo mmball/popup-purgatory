@@ -44,6 +44,7 @@ How the game works:
 - Bytes buy buildings. Imp Huts hire imps who walk to pop-ups and dismiss them for you; an Imp Dojo trains two imps from huts within 2 cells to complete instead; RAM Sticks raise ram_max; Coffee Carts speed imps from huts within 2 cells; nothing spawns within 3 cells of a Firewall; the Antivirus Shrine stops timeouts from multiplying; the Pointer Shrine pays +1 per pop-up you close yourself. Building prices rise with each copy. The bot places each building where its radius helps most.
 - A "sell" move demolishes one of your buildings for a refund (half its price, three quarters during a break); owned_buildings lists what you have.
 - A "recycle" move drags a pop-up to the Recycle Bin: it vanishes with no reward and no penalty (a recycled cookie banner spawns nothing), freeing its RAM. The bin holds bin.capacity windows; "empty_bin" clears it but takes 2 seconds, during which nothing can be dropped. It is an emergency valve, not a free X.
+- At 12 PM and 4 PM a Service Pack installer opens (boss.active): spawns and the clock hold, "boss_step" finishes its current page; done in time it pays bytes and a free upgrade, timed out it spawns errors. Trained imps also take pages on their own.
 - "ability" moves are keyboard chords: alt_f4 X-es the front window (free), task_manager instantly X-es the biggest windows (45 s cooldown), ctrl_alt_del freezes the desk for 4 s once an hour; abilities shows what is ready.
 - Between waves you pick one of three upgrades.
 - Spending bytes never lowers your score (score = total bytes earned), so build whenever it helps.
@@ -66,8 +67,10 @@ def heuristic(state):
     # "sell:x,y" moves are legal but the heuristic never sells; it only ever
     # picks the ids it names below, so they are dropped here to keep that explicit.
     moves = {m["id"]: m for m in state["legal_moves"] if m["kind"] != "sell"}
-    if state["in_break"]:
-        picks = [m for m in state["legal_moves"] if m["kind"] == "pick_upgrade"]
+    # A pick is offered in breaks and after a won installer (the boss bonus floats
+    # over the running hour): take it whenever it is on the table.
+    picks = [m for m in state["legal_moves"] if m["kind"] == "pick_upgrade"]
+    if picks:
         order = ["more_ram", "free_imp", "quick_hands", "complete_bonus", "fast_imps", "spawn_slower", "lean_popups",
                  "antivirus_patch", "dismiss_bonus", "click_bonus", "bigger_x", "bytes_now"]
         for want in order:
@@ -75,6 +78,8 @@ def heuristic(state):
                 if m["upgrade"] == want:
                     return m["id"], f"upgrade priority {want}"
         return picks[0]["id"], "first upgrade"
+    if state["in_break"]:
+        return "wait", "break with nothing to pick"
     pressure = state["ram_used"] / max(1, state["ram_max"])
     popups = state["popups"]
     bin_state = state.get("bin", {"items": 0, "capacity": 0})
@@ -98,6 +103,9 @@ def heuristic(state):
     for p in sorted(popups, key=lambda p: -p["ram_cost"]):
         if p.get("leak") and f"complete:{p['id']}" in moves:
             return f"complete:{p['id']}", "leak growing"
+    # 1a. the Service Pack installer: finish it before it times out
+    if "boss_step" in moves:
+        return "boss_step", "installer page"
     # 1c. abilities: Task Manager under RAM pressure, Ctrl+Alt+Del when overloaded
     if pressure > 0.8 and "ability:task_manager" in moves:
         return "ability:task_manager", f"task manager at ram {pressure:.2f}"

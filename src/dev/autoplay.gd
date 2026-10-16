@@ -212,6 +212,10 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		var refund := BuildingCatalog.refund(b.price_paid, run.in_break)
 		moves.append({"id": "sell:%d,%d" % [c.x, c.y], "kind": "sell", "building": b.id, "cell": [c.x, c.y], "refund": refund,
 			"desc": "sell the %s at %d,%d for %d bytes" % [BuildingCatalog.DEFS[b.id]["name"], c.x, c.y, refund]})
+	var boss_state := {"active": false}
+	if desktop.boss != null and not desktop.boss.is_finished():
+		boss_state = {"active": true, "done": desktop.boss.done, "steps": BossWindow.STEPS, "time_left": snappedf(desktop.boss.time_left, 0.1), "imps_working": desktop.boss.imps_working}
+		moves.append({"id": "boss_step", "kind": "boss_step", "desc": "work the Service Pack installer: finish its current page (%d of %d done, %.0f s left; a timeout spawns errors, finishing pays %d and a free upgrade)" % [desktop.boss.done, BossWindow.STEPS, desktop.boss.time_left, RunState.BOSS_REWARD]})
 	var abilities := {}
 	for aid: String in RunState.ABILITY_ORDER:
 		abilities[aid] = {"ready": run.ability_ready(aid), "cooldown_left": snappedf(run.ability_cooldown_left(aid), 0.1)}
@@ -234,7 +238,7 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		"overloaded": run.overloaded, "imps": desktop.imp_manager.imps.size(), "trained": desktop.imp_manager.count_trained(),
 		"buildings": buildings, "owned_buildings": owned_buildings, "upgrades": run.upgrades_picked, "popups": popups, "legal_moves": moves,
 		"bin": {"items": run.bin_items, "capacity": Tuning.inum("run.bin_capacity", RunState.BIN_CAPACITY), "emptying": desktop._bin_emptying},
-		"abilities": abilities,
+		"abilities": abilities, "boss": boss_state,
 	}
 
 
@@ -306,6 +310,8 @@ func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> vo
 			desktop.empty_bin()
 		"ability":
 			_use_ability(desktop, parts[1])
+		"boss_step":
+			_bot_boss_step(desktop)
 		"pick":
 			for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
 				var card := b.get_parent().get_parent()
@@ -331,6 +337,22 @@ func _use_ability(desktop: Desktop, id: String) -> void:
 			desktop.freeze_for(4.0)
 
 
+## One click on the Service Pack installer when it is up: types the key if
+## the page wants one, then clicks the first control the window recommends.
+## Returns true when the boss took this tick.
+func _bot_boss_step(desktop: Desktop) -> bool:
+	var b := desktop.boss
+	if b == null or b.is_finished():
+		return false
+	var le := b.bot_line_edit()
+	if le != null:
+		le.text = b.bot_text()
+	var controls := b.bot_controls()
+	if not controls.is_empty():
+		_click(_center(controls[0]))
+	return true
+
+
 # ---------- greedy ----------
 
 func _step_greedy(desktop: Desktop) -> void:
@@ -349,6 +371,8 @@ func _step_greedy(desktop: Desktop) -> void:
 			_click(desktop.village.cell_center(cell))
 		else:
 			desktop.village.cancel_place()
+		return
+	if _bot_boss_step(desktop):
 		return
 	if desktop.task_manager != null:
 		# End Task until the uses run out (the window closes itself), through the GUI.
@@ -443,6 +467,17 @@ func _step_random(desktop: Desktop) -> void:
 			_click(Vector2(640, 400))
 		else:
 			_click(_center(items[rng.randi_range(0, items.size() - 1)]))
+		return
+	if desktop.boss != null and not desktop.boss.is_finished():
+		var le := desktop.boss.bot_line_edit()
+		if le != null and rng.randf() < 0.5:
+			le.text = desktop.boss.bot_text()
+		var bc: Array[Control] = []
+		for c: Control in _find_all(desktop.boss, _is_base_button):
+			if c.is_visible_in_tree() and not (c is Button and c.disabled):
+				bc.append(c)
+		if not bc.is_empty():
+			_click(_center(bc[rng.randi_range(0, bc.size() - 1)]))
 		return
 	var roll := rng.randf()
 	if roll < 0.1:

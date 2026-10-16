@@ -185,13 +185,21 @@ what was earned after. Then the choice at 5 PM is a real one.
 **Implementation.** `RunState.banked_score`, `overtime_mult`; `SpawnSchedule` reads an
 extra overtime step; `BreakDialog` takes a card count. Tests for the banking rule.
 
-## 9. Bosses at noon and 4 PM
+## 9. Bosses at noon and 4 PM — DONE 2026-10-16
 
 **Verdict.** Yes, but it is the largest content item and belongs in roadmap M4 after the
 above. A full-screen "Service Pack Install" modal with ten steps (uncheck, type, wait,
 find the tiny link) while spawns pause; trained imps can each take one step; a big
 reward and a guaranteed counter-upgrade card afterwards. It gives the day a shape and
 makes 12 PM and 4 PM landmarks on the clock.
+
+*Shipped as designed: `BossWindow` (ten pages, 75 s, traps spawn an ad), opened by the
+desktop at the start of waves 4 and 8, never in overtime. Trained imps take one page
+each through `ImpManager.request_boss`. The win pays 60 bytes and a free pick of three
+upgrades, counters to unlocked pop-ups first; a timeout spawns three errors. The upgrade
+pool is not rolled from a separate "counter" list: counters are the upgrades that gate
+on an achievement. Bots: greedy and random click through it, the external policy gets a
+`boss_step` move. Telemetry boss_start / boss_step / boss_end.*
 
 ## Phases
 
