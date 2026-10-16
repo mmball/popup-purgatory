@@ -142,7 +142,7 @@ func _step_desktop(desktop: Desktop) -> void:
 ## legal moves, then blocks (game time pauses with --fixed-fps) until the driver
 ## writes <dir>/move_<seq>.json {"move": "<id>"}. Menus, placement and the break
 ## dialog are handled by the greedy rules; the driver only decides the strategic
-## moves: which pop-up to work on and how, what to build, which upgrade to take.
+## moves: which pop-up to work on and how, what to build or sell, which upgrade to take.
 
 func _step_external(desktop: Desktop) -> void:
 	var run := desktop.run
@@ -151,7 +151,7 @@ func _step_external(desktop: Desktop) -> void:
 		_click(_center(_find_button(desktop._confirm, "No")))
 		return
 	if desktop.village.is_placing():
-		var cell := desktop.village.first_free_cell()
+		var cell := desktop.village.suggest_cell(desktop.village.placing_id)
 		if cell.x >= 0:
 			_click(desktop.village.cell_center(cell))
 		else:
@@ -199,8 +199,15 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		for id: String in BuildingCatalog.available(run.unlocked_buildings):
 			var owned := desktop.village.count(id)
 			var cost := desktop.building_cost(id, owned)
-			if owned < BuildingCatalog.max_count(id) and run.bytes >= cost and desktop.village.first_free_cell().x >= 0:
+			if owned < BuildingCatalog.max_count(id) and run.bytes >= cost and desktop.village.suggest_cell(id).x >= 0:
 				moves.append({"id": "build:" + id, "kind": "build", "building": id, "cost": cost, "desc": "%s (%d bytes): %s" % [BuildingCatalog.DEFS[id]["name"], cost, BuildingCatalog.DEFS[id]["desc"]]})
+	var owned_buildings := {}
+	for c: Vector2i in desktop.village.buildings.keys():
+		var b: Building = desktop.village.buildings[c]
+		owned_buildings[b.id] = int(owned_buildings.get(b.id, 0)) + 1
+		var refund := BuildingCatalog.refund(b.price_paid, run.in_break)
+		moves.append({"id": "sell:%d,%d" % [c.x, c.y], "kind": "sell", "building": b.id, "cell": [c.x, c.y], "refund": refund,
+			"desc": "sell the %s at %d,%d for %d bytes" % [BuildingCatalog.DEFS[b.id]["name"], c.x, c.y, refund]})
 	var buildings := {}
 	for id: String in BuildingCatalog.ORDER:
 		buildings[id] = desktop.village.count(id)
@@ -210,7 +217,7 @@ func _external_state(desktop: Desktop) -> Dictionary:
 		"wave_time_left": snappedf(run.wave_time_left, 0.1), "in_break": run.in_break,
 		"bytes": run.bytes, "score": run.score, "ram_used": run.ram_used, "ram_max": run.ram_max,
 		"overloaded": run.overloaded, "imps": desktop.imp_manager.imps.size(), "trained": desktop.imp_manager.count_trained(),
-		"buildings": buildings, "upgrades": run.upgrades_picked, "popups": popups, "legal_moves": moves,
+		"buildings": buildings, "owned_buildings": owned_buildings, "upgrades": run.upgrades_picked, "popups": popups, "legal_moves": moves,
 	}
 
 
@@ -270,6 +277,10 @@ func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> vo
 			var idx := BuildingCatalog.ORDER.find(parts[1])
 			if idx >= 0:
 				desktop._begin_place(BuildingCatalog.ORDER[idx])  # placement is finished by the mechanical rules
+		"sell":
+			var xy := parts[1].split(",")
+			if xy.size() == 2:
+				desktop.call("demolish", Vector2i(int(xy[0]), int(xy[1])))  # call(): Desktop.demolish lands with the desktop change
 		"pick":
 			for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
 				var card := b.get_parent().get_parent()
@@ -292,7 +303,7 @@ func _step_greedy(desktop: Desktop) -> void:
 		_click(_center(_find_button(desktop._confirm, "No")))
 		return
 	if desktop.village.is_placing():
-		var cell := desktop.village.first_free_cell()
+		var cell := desktop.village.suggest_cell(desktop.village.placing_id)
 		if cell.x >= 0:
 			_click(desktop.village.cell_center(cell))
 		else:

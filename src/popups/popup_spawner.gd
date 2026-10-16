@@ -11,10 +11,12 @@ var run: RunState
 var rng: RandomNumberGenerator
 var schedule: SpawnSchedule
 var layer: Control          ## where windows are added; its rect bounds them
+var village: Village        ## set by Desktop for firewall no-spawn zones; null in tests
 var active := true
 var screensaver := false     ## Screensaver building: periodic spawn pause
 const SCREENSAVER_PERIOD := 30.0
 const SCREENSAVER_PAUSE := 6.0
+const ZONE_TRIES := 12      ## redraws before a spawn is pushed out of a firewall zone
 
 var _timer := 1.5
 var _queued: Array[Dictionary] = []
@@ -74,6 +76,25 @@ func spawn(type_id: String, near: Variant = null) -> PopupBase:
 func _pick_position(win_size: Vector2, near: Variant) -> Vector2:
 	var max_x := maxf(MARGIN, layer.size.x - win_size.x - MARGIN)
 	var max_y := maxf(MARGIN, layer.size.y - win_size.y - MARGIN)
+	var zones: Array[Dictionary] = []
+	if village != null:
+		zones = village.firewall_zones()
+	# With no zones the first candidate is always taken, so the rng draws are
+	# exactly what they were before firewalls had a radius (seeded layouts hold).
+	var p: Vector2
+	for _i in range(ZONE_TRIES):
+		p = _draw_candidate(win_size, near, max_x, max_y)
+		if position_allowed(Rect2(p, win_size), zones):
+			return p
+	# Every try landed on a firewall: shove the last one out of the nearest zone.
+	p = push_outside(Rect2(p, win_size), zones)
+	p.x = clampf(p.x, MARGIN, max_x)
+	p.y = clampf(p.y, MARGIN, max_y)
+	return p.round()
+
+
+## One random window position (two rng draws), clamped to the layer.
+func _draw_candidate(win_size: Vector2, near: Variant, max_x: float, max_y: float) -> Vector2:
 	var p: Vector2
 	if near is Vector2:
 		p = near + Vector2(rng.randf_range(-60, 60), rng.randf_range(-40, 40))
@@ -82,3 +103,46 @@ func _pick_position(win_size: Vector2, near: Variant) -> Vector2:
 	p.x = clampf(p.x, MARGIN, max_x)
 	p.y = clampf(p.y, MARGIN, max_y)
 	return p.round()
+
+
+## Point of `rect` closest to `c` (c itself when it lies inside).
+static func _closest_point(rect: Rect2, c: Vector2) -> Vector2:
+	return Vector2(clampf(c.x, rect.position.x, rect.end.x), clampf(c.y, rect.position.y, rect.end.y))
+
+
+## True when a window at `rect` overlaps none of the zone circles
+## ({"center": Vector2, "radius": float}, pixels). Touching the edge is allowed.
+static func position_allowed(rect: Rect2, zones: Array[Dictionary]) -> bool:
+	for z: Dictionary in zones:
+		var c: Vector2 = z["center"]
+		if _closest_point(rect, c).distance_to(c) < float(z["radius"]):
+			return false
+	return true
+
+
+## Position for `rect` moved just outside the zone it overlaps most, along the
+## vector from that zone's centre. Unchanged when it overlaps nothing.
+static func push_outside(rect: Rect2, zones: Array[Dictionary]) -> Vector2:
+	var worst := -INF
+	var centre := Vector2.ZERO
+	var radius := 0.0
+	for z: Dictionary in zones:
+		var c: Vector2 = z["center"]
+		var r := float(z["radius"])
+		var depth := r - _closest_point(rect, c).distance_to(c)
+		if depth > worst:
+			worst = depth
+			centre = c
+			radius = r
+	if worst <= 0.0:
+		return rect.position
+	var q := _closest_point(rect, centre)
+	var dir := q - centre
+	var shift := worst + 1.0
+	if dir.length_squared() == 0.0:
+		# the centre lies inside the window: leave along the window's own centre
+		dir = rect.get_center() - centre
+		if dir.length_squared() == 0.0:
+			dir = Vector2.RIGHT
+		shift = radius + 1.0 + rect.size.length()
+	return rect.position + dir.normalized() * shift

@@ -41,7 +41,8 @@ How the game works:
 - Some pop-ups punish neglect: timeout_kind "multiply" clones the pop-up when age_since_timeout reaches lifetime; "spawn" spawns errors; "escalate" raises its RAM cost. Close those before they time out.
 - Targeted challenges: a pop-up with dismiss_spawns>0 (cookie banner) spawns that many more if you dismiss it, so complete it instead. imp_proof pop-ups (Live Chat) dodge imps unless you own a Help Desk. leak pop-ups grow their RAM cost every few seconds until completed; dismissing pays nothing.
 - The run is one workday of 8 waves; survive wave 8 and you clock out (a win). After that, overtime is endless.
-- Bytes buy buildings. Imp Huts hire imps who walk to pop-ups and dismiss them for you; an Imp Dojo trains two imps to complete instead; RAM Sticks raise ram_max; Coffee Carts speed imps; Firewalls slow spawning; the Antivirus Shrine stops timeouts from multiplying; the Pointer Shrine pays +1 per pop-up you close yourself. Building prices rise with each copy.
+- Bytes buy buildings. Imp Huts hire imps who walk to pop-ups and dismiss them for you; an Imp Dojo trains two imps from huts within 2 cells to complete instead; RAM Sticks raise ram_max; Coffee Carts speed imps from huts within 2 cells; nothing spawns within 3 cells of a Firewall; the Antivirus Shrine stops timeouts from multiplying; the Pointer Shrine pays +1 per pop-up you close yourself. Building prices rise with each copy. The bot places each building where its radius helps most.
+- A "sell" move demolishes one of your buildings for a refund (half its price, three quarters during a break); owned_buildings lists what you have.
 - Between waves you pick one of three upgrades.
 - Spending bytes never lowers your score (score = total bytes earned), so build whenever it helps.
 Strategy hints: keep ram_used comfortably under ram_max; prefer complete over dismiss when RAM is safe; buy huts early; when nothing is urgent, choose "wait"."""
@@ -60,7 +61,9 @@ MOVE_SCHEMA = {
 # ---------- backends ----------
 
 def heuristic(state):
-    moves = {m["id"]: m for m in state["legal_moves"]}
+    # "sell:x,y" moves are legal but the heuristic never sells; it only ever
+    # picks the ids it names below, so they are dropped here to keep that explicit.
+    moves = {m["id"]: m for m in state["legal_moves"] if m["kind"] != "sell"}
     if state["in_break"]:
         picks = [m for m in state["legal_moves"] if m["kind"] == "pick_upgrade"]
         order = ["more_ram", "free_imp", "quick_hands", "complete_bonus", "fast_imps", "spawn_slower", "lean_popups",
