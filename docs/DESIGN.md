@@ -35,6 +35,13 @@ Score is total bytes earned. Spending doesn't reduce score, so building is never
 sacrifice; the only pressure is time and your one cursor. The taskbar clock shows the
 in-game time of day, so the run length is legible without a timer.
 
+Streak: each consecutive manual completion adds 10% to manual completion rewards, capped
+at +50%; a manual X resets it; imp closes neither add nor reset.
+
+Overtime: pays 1.5x, the spawn interval tightens 10% per overtime hour on top of the
+normal step, breaks offer one card, and the 5 PM score is banked: a crash in overtime
+counts the banked score plus half of what came after.
+
 ### Difficulty ladder: Service Packs
 
 Opt-in from the main menu. Clocking out on SP n unlocks SP n+1. Each tier stacks on the
@@ -95,7 +102,11 @@ Unlockable types only enter the pool once their achievement is earned.
 
 ## Imps
 
-- Hired by Imp Huts. Idle near home, claim the oldest-ish nearby pop-up, walk to its X
+- Hired by Imp Huts. A dojo with a free slot (two per dojo) pulls the nearest idle
+  untrained imp: it walks in, a bar fills over the dojo for 6 s, and it comes out trained
+  (bigger body, black belt, mortarboard; it reads a book while completing).
+- Experience: each close adds 2% speed, capped at +30% (15 closes); ten closes earn a
+  service stripe. Idle near home, claim the oldest-ish nearby pop-up, walk to its X
   button, stand there for a work timer, close it.
 - Untrained imps dismiss (0.6s, X reward). Trained imps complete (per-type time, full
   completion reward). Dojos add two training slots each.

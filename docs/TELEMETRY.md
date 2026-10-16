@@ -46,7 +46,12 @@ Written by `Telemetry` for every run, bot or human. Every row has
 | upgrade_offered | ids[] | break dialog shown |
 | upgrade_picked | id | card chosen |
 | overload | active, seconds_left | RAM crossed the limit, or recovered |
+| train_start | imp, closes | an untrained imp sets off for a dojo |
+| train_done | imp, trained_total | it comes out trained (6 s later) |
 | run_end | reason + `RunState.summary()` minus waves | run over |
+
+`popup_closed` also carries `streak` (manual completion streak after the close). Run rows
+carry `banked_score`, `final_score` and `best_streak`.
 
 ## Rules
 

@@ -33,7 +33,18 @@ var in_break := false
 var elapsed := 0.0
 var won := false             ## clocked out at 5 PM
 var overtime := false        ## kept working after the win
+var banked_score := 0        ## score at 5 PM; a crash in overtime keeps it plus half the rest
 var tier := 0                ## Service Pack level (Ladder)
+
+# --- streak: consecutive manual completions; any manual X resets it ---
+const STREAK_STEP := 0.10
+const STREAK_CAP := 5
+var streak := 0
+var best_streak := 0
+
+# --- overtime terms ---
+const OVERTIME_PAY := 1.5
+const OVERTIME_SPAWN_STEP := 0.9   ## interval multiplier per overtime hour
 
 # --- content pools unlocked for this run (ids); empty means catalog default ---
 var unlocked_popups: Array[String] = []
@@ -97,7 +108,8 @@ func summary() -> Dictionary:
 		"completed": popups_completed, "player_closes": player_closes, "imp_closes": imp_closes,
 		"imps_hired": imps_hired, "buildings_built": buildings_built, "buildings": buildings_list,
 		"upgrades": upgrades_picked, "ram_max": ram_max, "waves": wave_log, "tune": Tuning.spec,
-		"tier": tier, "won": won, "overtime": overtime,
+		"tier": tier, "won": won, "overtime": overtime, "banked_score": banked_score,
+		"final_score": final_score(), "best_streak": best_streak,
 	}
 
 
@@ -128,6 +140,7 @@ func clock() -> Dictionary:
 
 func clock_out() -> void:
 	won = true
+	banked_score = score
 
 
 func start_overtime() -> void:
@@ -185,12 +198,42 @@ func spend(n: int) -> bool:
 	return true
 
 
-## Reward for closing a pop-up with the given definition.
-func reward_for(def: Dictionary, completed: bool) -> int:
+## Reward for closing a pop-up with the given definition. `manual` closes get
+## the streak bonus on completions; overtime hours pay OVERTIME_PAY.
+func reward_for(def: Dictionary, completed: bool, manual: bool = false) -> int:
 	var base: int = def.get("complete_reward", 5) if completed else def.get("dismiss_reward", 1)
 	var mult := complete_mult if completed else dismiss_mult
+	if manual and completed:
+		mult *= streak_mult()
+	if overtime:
+		mult *= Tuning.num("run.overtime_pay", OVERTIME_PAY)
 	var r := int(round(base * mult))
 	return maxi(r, 1) if base > 0 else 0
+
+
+func streak_mult() -> float:
+	return 1.0 + Tuning.num("run.streak_step", STREAK_STEP) * mini(streak, Tuning.inum("run.streak_cap", STREAK_CAP))
+
+
+## Call after a manual close has been rewarded.
+func note_manual_close(completed: bool) -> void:
+	if completed:
+		streak += 1
+		best_streak = maxi(best_streak, streak)
+	else:
+		streak = 0
+
+
+func overtime_hours() -> int:
+	return maxi(0, wave - WORKDAY_WAVES) if overtime else 0
+
+
+## What the run is worth when it ends: everything if it ended by clocking out
+## or before 5 PM; in overtime the banked 5 PM score plus half of what came after.
+func final_score() -> int:
+	if overtime and crash_reason != "SHUTDOWN":
+		return banked_score + (score - banked_score) / 2
+	return score
 
 
 ## RAM a pop-up of this definition occupies while open, after modifiers.

@@ -3,11 +3,15 @@ extends Node2D
 ## A little worker. Idles near its home, walks to a pop-up, stands on its X
 ## button for a moment, then closes it. Trained imps complete instead of dismiss.
 
-enum State { IDLE, SEEK, WORK }
+enum State { IDLE, SEEK, WORK, TRAIN }
 
 const BASE_SPEED := 90.0
 const DISMISS_TIME := 0.6
 const ARRIVE_DIST := 4.0
+const TRAIN_TIME := 6.0
+const XP_STEP := 0.02        ## speed per close
+const XP_CAP := 15           ## closes that count
+const VETERAN_CLOSES := 10
 
 var manager: Node          ## ImpManager
 var run: RunState
@@ -29,6 +33,9 @@ var _retarget_timer := 0.0
 var _work_left := 0.0
 var _work_total := 1.0
 var hop_y := 0.0          ## animated by Juice.hop; added to the drawing offset
+var closes := 0           ## experience: each close speeds the imp up a little
+var dojo: Node2D          ## the dojo being walked to / trained in (TRAIN state)
+var _train_left := 0.0
 var _alert_t := 0.0       ## seconds left to draw the "!" after acquiring a target
 var _sulk_t := 0.0        ## seconds left to draw the frown after being dodged
 
@@ -41,7 +48,54 @@ func _ready() -> void:
 
 func speed() -> float:
 	var m := run.imp_speed_mult if run != null else 1.0
-	return Tuning.num("imp.base_speed", BASE_SPEED) * m
+	return Tuning.num("imp.base_speed", BASE_SPEED) * m * xp_mult()
+
+
+func xp_mult() -> float:
+	return 1.0 + XP_STEP * mini(closes, XP_CAP)
+
+
+func is_veteran() -> bool:
+	return closes >= VETERAN_CLOSES
+
+
+## Sent to a dojo with a free slot. The imp walks there, disappears inside for
+## TRAIN_TIME, and comes out trained.
+func start_training(p_dojo: Node2D) -> void:
+	if state == State.WORK or state == State.SEEK:
+		_drop_target()
+	dojo = p_dojo
+	dojo.set("trainee", self)
+	dojo.set("train_progress", 0.0)
+	state = State.TRAIN
+	_train_left = -1.0  # walking; becomes TRAIN_TIME on arrival
+
+
+func _train(delta: float) -> void:
+	if not is_instance_valid(dojo):
+		state = State.IDLE
+		visible = true
+		return
+	if _train_left < 0.0:
+		if _move_toward(dojo.position + Vector2(0, 4), speed(), delta) <= ARRIVE_DIST:
+			_train_left = TRAIN_TIME
+			visible = false
+		return
+	_train_left -= delta
+	dojo.set("train_progress", 1.0 - _train_left / TRAIN_TIME)
+	if _train_left <= 0.0:
+		visible = true
+		position = dojo.position + Vector2(0, 14)
+		home = position
+		trained = true
+		dojo.set("graduates", int(dojo.get("graduates")) + 1)
+		dojo.set("trainee", null)
+		dojo.set("train_progress", 0.0)
+		var d := dojo
+		dojo = null
+		state = State.IDLE
+		Juice.hop(self, 18.0)
+		manager.call("on_imp_trained", self, d)
 
 
 func _process(delta: float) -> void:
@@ -55,6 +109,8 @@ func _process(delta: float) -> void:
 			_seek(delta)
 		State.WORK:
 			_work(delta)
+		State.TRAIN:
+			_train(delta)
 	queue_redraw()
 
 
@@ -119,6 +175,7 @@ func _work(delta: float) -> void:
 		target = null
 		state = State.IDLE
 		manager.release(self)
+		closes += 1
 		Juice.hop(self)
 		if trained:
 			t.complete(true)
@@ -145,9 +202,17 @@ func _draw() -> void:
 	# feet
 	draw_circle(Vector2(-4, 1), 2.5, c.darkened(0.4))
 	draw_circle(Vector2(4, 1), 2.5, c.darkened(0.4))
-	# body
+	# body (trained imps are a touch bigger)
 	var bc := Vector2(0, -9 + bob)
-	draw_circle(bc, 8, c)
+	var r := 9.0 if trained else 8.0
+	draw_circle(bc, r, c)
+	if trained:
+		# black belt
+		draw_rect(Rect2(bc + Vector2(-r + 1, 3), Vector2(2 * r - 2, 3)), Color("111111"))
+		draw_rect(Rect2(bc + Vector2(1, 3), Vector2(3, 3)), Color("ffd700"))
+	if is_veteran():
+		# service stripe
+		draw_rect(Rect2(bc + Vector2(-r + 1, -2), Vector2(4, 2)), Color("ffd700"))
 	# horns
 	var hc := c.darkened(0.25)
 	draw_polygon(PackedVector2Array([bc + Vector2(-6, -5), bc + Vector2(-8, -13), bc + Vector2(-2, -7)]), PackedColorArray([hc]))
@@ -173,10 +238,18 @@ func _draw() -> void:
 		draw_rect(Rect2(bc + Vector2(-4, -18), Vector2(8, 3)), Color("222222"))
 		draw_line(bc + Vector2(7, -14), bc + Vector2(9, -9), Color("ffd700"), 1.0)
 	if state == State.WORK:
-		# pointer bouncing above the head + progress ring
 		var py := -24 + bob * 2.0
-		var pts := PackedVector2Array([Vector2(0, py), Vector2(0, py + 10), Vector2(3, py + 7), Vector2(7, py + 8)])
-		draw_polygon(pts, PackedColorArray([Color.WHITE]))
-		draw_polyline(pts, Color.BLACK, 1.0)
+		if trained:
+			# a little book: trained imps read the pop-up instead of just clicking
+			draw_rect(Rect2(-5, py, 10, 8), Color.WHITE)
+			draw_rect(Rect2(-5, py, 10, 8), Color.BLACK, false, 1.0)
+			draw_line(Vector2(0, py + 1), Vector2(0, py + 7), Color.BLACK, 1.0)
+			draw_line(Vector2(-3, py + 3), Vector2(-1, py + 3), Color("808080"), 1.0)
+			draw_line(Vector2(1, py + 3), Vector2(3, py + 3), Color("808080"), 1.0)
+		else:
+			# pointer bouncing above the head
+			var pts := PackedVector2Array([Vector2(0, py), Vector2(0, py + 10), Vector2(3, py + 7), Vector2(7, py + 8)])
+			draw_polygon(pts, PackedColorArray([Color.WHITE]))
+			draw_polyline(pts, Color.BLACK, 1.0)
 		var frac := 1.0 - clampf(_work_left / maxf(0.01, _work_total), 0.0, 1.0)
 		draw_arc(bc, 11, -PI / 2, -PI / 2 + TAU * frac, 16, Color("ffd700"), 2.0)

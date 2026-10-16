@@ -1,6 +1,11 @@
 class_name ImpManager
 extends Node
-## Owns the imps, hands out pop-up targets, and applies training slots.
+## Owns the imps, hands out pop-up targets, and runs dojo training: a dojo with
+## a free slot pulls the nearest idle untrained imp, who walks in, trains for
+## Imp.TRAIN_TIME and comes out trained.
+
+signal training_started(imp: Imp, dojo: Node2D)
+signal imp_trained(imp: Imp, dojo: Node2D)
 
 var run: RunState
 var rng: RandomNumberGenerator
@@ -8,7 +13,7 @@ var layer: Node2D         ## imps are added here
 var popup_layer: Control  ## pop-ups are read from here
 var assigner := TargetAssigner.new()
 var imps: Array[Imp] = []
-var training_slots := 0
+var dojos: Array[Node2D] = []
 
 const COLORS := [Color("8b2fc9"), Color("c93a2f"), Color("2f7fc9"), Color("2fa85a"), Color("d97f1f")]
 
@@ -31,13 +36,52 @@ func spawn_imp(home: Vector2) -> Imp:
 	layer.add_child(imp)
 	imps.append(imp)
 	run.imps_hired += 1
-	_apply_training()
 	return imp
 
 
-func add_training_slots(n: int) -> void:
-	training_slots += n
-	_apply_training()
+func add_dojo(b: Node2D) -> void:
+	dojos.append(b)
+
+
+func _process(_delta: float) -> void:
+	_assign_training()
+
+
+## Pairs each dojo with a free slot to the nearest idle untrained imp.
+func _assign_training() -> void:
+	for d: Node2D in dojos:
+		if not is_instance_valid(d) or not bool(d.call("has_free_slot")):
+			continue
+		var pick := pick_trainee(d.position)
+		if pick != null:
+			pick.start_training(d)
+			training_started.emit(pick, d)
+
+
+## The nearest imp that is untrained and not already training or working.
+func pick_trainee(from: Vector2) -> Imp:
+	var best: Imp = null
+	var best_d := INF
+	for imp: Imp in imps:
+		if imp.trained or imp.state == Imp.State.TRAIN or imp.state == Imp.State.WORK:
+			continue
+		var dist := from.distance_to(imp.position)
+		if dist < best_d:
+			best_d = dist
+			best = imp
+	return best
+
+
+func on_imp_trained(imp: Imp, dojo: Node2D) -> void:
+	imp_trained.emit(imp, dojo)
+
+
+func training_slots() -> int:
+	var n := 0
+	for d: Node2D in dojos:
+		if is_instance_valid(d):
+			n += Building.DOJO_SLOTS
+	return n
 
 
 func count_trained() -> int:
@@ -46,14 +90,6 @@ func count_trained() -> int:
 		if imp.trained:
 			n += 1
 	return n
-
-
-func _apply_training() -> void:
-	for imp: Imp in imps:
-		if count_trained() >= training_slots:
-			return
-		if not imp.trained:
-			imp.trained = true
 
 
 func live_popups() -> Array[PopupBase]:

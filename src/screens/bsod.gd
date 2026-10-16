@@ -69,10 +69,13 @@ func _draw() -> void:
 		lines.append("  Closed by imps ...... %d" % run.imp_closes)
 		lines.append("  Imps hired .......... %d" % run.imps_hired)
 		lines.append("  Buildings built ..... %d" % run.buildings_built)
+		lines.append("  Best streak ......... %d" % run.best_streak)
+		if run.overtime:
+			lines.append("  Banked at 5 PM ...... %d  (+%d in overtime, half counts: %d)" % [run.banked_score, run.score - run.banked_score, run.final_score()])
 		lines.append("  Time at the desk .... %d:%02d" % [int(run.elapsed) / 60, int(run.elapsed) % 60])
 		lines.append("  Run seed ............ %d" % run.seed)
 		var meta: MetaSave = Game.meta
-		if meta != null and run.score > 0 and run.score >= meta.high_score:
+		if meta != null and run.final_score() > 0 and run.final_score() >= meta.high_score:
 			lines.append("")
 			lines.append("  NEW HIGH SCORE")
 		for a: String in Game.last_earned:

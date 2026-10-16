@@ -94,6 +94,10 @@ func _ready() -> void:
 
 	imp_manager = ImpManager.new()
 	imp_manager.setup(run, rng, imp_layer, popup_layer)
+	imp_manager.training_started.connect(func(imp: Imp, dojo: Node2D) -> void:
+		_log("train_start", {"imp": imp.get_instance_id(), "closes": imp.closes})
+		_float("off to the dojo", imp.position + Vector2(0, -28), Color.WHITE, 11))
+	imp_manager.imp_trained.connect(_on_imp_trained)
 	add_child(imp_manager)
 
 	run.crashed.connect(_on_crashed)
@@ -169,6 +173,18 @@ func _feel(delta: float) -> void:
 			Sfx.play("rise", lerpf(0.8, 1.6, clampf((fill - 0.75) / 0.35, 0.0, 1.0)), -4.0, 0.0)
 
 
+var _graduation_hint_shown := false
+
+
+func _on_imp_trained(imp: Imp, dojo: Node2D) -> void:
+	_log("train_done", {"imp": imp.get_instance_id(), "trained_total": imp_manager.count_trained()})
+	_float("graduated!", imp.position + Vector2(0, -30), Color("7CFC00"), 14)
+	Sfx.play("chime_big", 1.1, 0.0, 0.0)
+	if not _graduation_hint_shown:
+		_graduation_hint_shown = true
+		_float("Trained imps complete pop-ups for the full reward.", Vector2(640, 150), Color.WHITE, 15, 30.0, 3.0)
+
+
 func _open_telemetry() -> void:
 	if not Game.dev.has("no_telemetry"):
 		var dir := str(Game.dev.get("telemetry_dir", "user://telemetry"))
@@ -241,13 +257,20 @@ func _wire_popup(popup: PopupBase) -> void:
 
 
 func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
-	var reward := run.reward_for(popup.def, completed)
+	var reward := run.reward_for(popup.def, completed, not by_imp)
 	if not by_imp:
 		reward += run.click_bonus
+	var streak_before := run.streak
 	run.popup_closed(popup.ram_cost, completed, by_imp)
 	run.add_bytes(reward)
+	if not by_imp:
+		run.note_manual_close(completed)
+		if completed and run.streak >= 3 and run.streak <= RunState.STREAK_CAP:
+			_float("streak x%d" % run.streak, popup.global_position + Vector2(popup.size.x * 0.5, -8), Color("ffd700"), 13)
+		elif not completed and streak_before >= 3:
+			_float("streak lost", popup.global_position + Vector2(popup.size.x * 0.5, -8), Color("ff6060"), 12)
 	imp_manager.on_popup_closed(popup)
-	_log("popup_closed", {"type": popup.type_id, "completed": completed, "by_imp": by_imp, "age": snappedf(popup.total_age, 0.01), "reward": reward, "ram_used": run.ram_used})
+	_log("popup_closed", {"type": popup.type_id, "completed": completed, "by_imp": by_imp, "age": snappedf(popup.total_age, 0.01), "reward": reward, "ram_used": run.ram_used, "streak": run.streak})
 	var at := popup.global_position + Vector2(popup.size.x * 0.5, 10)
 	var col := Color("7CFC00") if completed else Color.WHITE
 	if reward > 0:
@@ -255,7 +278,7 @@ func _on_popup_closed(popup: PopupBase, completed: bool, by_imp: bool) -> void:
 	else:
 		_float("leak stopped" if popup.def.has("leak") else "closed", at, Color("c0c0c0"), 12)
 	if completed:
-		Sfx.play("chime_big" if reward >= 8 else "chime", 1.0 + minf(reward, 10) * 0.02)
+		Sfx.play("chime_big" if reward >= 8 else "chime", 1.0 + minf(reward, 10) * 0.02 + (0.05 * mini(run.streak, RunState.STREAK_CAP) if not by_imp else 0.0))
 	else:
 		Sfx.play("click", 1.0 if not by_imp else 1.25)
 	if not completed and popup.dismiss_spawns() > 0:
@@ -358,8 +381,8 @@ func _workday_end() -> void:
 	village.cancel_place()
 	start_menu.visible = false
 	_banner("5:00 PM", Color("ffd700"))
-	_clockout = ConfirmDialog.new("It's 5:00 PM", "You survived the workday. Clock out now, or stay for Overtime?\n\nOvertime keeps going until the machine crashes. Your score only goes up.")
-	_clockout.set_window_size(Vector2(360, 150))
+	_clockout = ConfirmDialog.new("It's 5:00 PM", "You survived the workday with %d bytes banked.\n\nOvertime pays 1.5x but spawns 10%% faster every hour, breaks offer one card, and if the machine crashes you keep the banked %d plus half of what you earned after." % [run.score, run.score])
+	_clockout.set_window_size(Vector2(400, 190))
 	var yes := _find_button(_clockout, "Yes")
 	var no := _find_button(_clockout, "No")
 	if yes != null:
@@ -399,7 +422,7 @@ func _start_break() -> void:
 	_wave_score_start = run.score
 	_float("Hour %d done: +%d bytes" % [run.wave, earned], Vector2(640, 190), Color("ffd700"), 22)
 	Sfx.play("chime_big", 0.9, 0.0, 0.0)
-	var choices := UpgradeCatalog.roll(rng, run, 3)
+	var choices := UpgradeCatalog.roll(rng, run, 1 if run.overtime else 3)
 	var offered: Array[String] = []
 	for c: Dictionary in choices:
 		offered.append(str(c["id"]))
@@ -495,7 +518,7 @@ func _build(id: String, cell: Vector2i, cost: int) -> void:
 		"hut":
 			imp_manager.spawn_imp(at + Vector2(0, 18))
 		"dojo":
-			imp_manager.add_training_slots(2)
+			imp_manager.add_dojo(village.buildings[cell])
 		"coffee":
 			run.imp_speed_mult *= 1.25
 		"ram":
@@ -623,8 +646,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ---------- helpers ----------
 
-func _float(text: String, at: Vector2, color: Color, font_size: int) -> void:
-	FloatText.spawn(float_layer, at, text, color, font_size)
+func _float(text: String, at: Vector2, color: Color, font_size: int, rise: float = 40.0, duration: float = 0.9) -> void:
+	FloatText.spawn(float_layer, at, text, color, font_size, rise, duration)
 
 
 func _banner(text: String, color: Color) -> void:

@@ -7,14 +7,14 @@ const COST_GROWTH := 0.5
 const DEFS := {
 	"hut": {
 		"name": "Imp Hut",
-		"desc": "Hires one imp. Imps walk to pop-ups and X them out.",
+		"desc": "Hires one imp. Untrained imps walk to pop-ups and X them out (small reward).",
 		"cost": 20,
 		"max": 12,
 		"color": Color("a0522d"),
 	},
 	"dojo": {
 		"name": "Imp Dojo",
-		"desc": "Trains two imps to complete pop-ups instead of dismissing them.",
+		"desc": "Trains two of the imps you already have: they walk in, train for 6 s, and come out completing pop-ups for the full reward.",
 		"cost": 50,
 		"max": 6,
 		"color": Color("b22222"),

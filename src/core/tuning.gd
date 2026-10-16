@@ -6,7 +6,8 @@ extends RefCounted
 ## with their built-in value as the default, so with no overrides nothing changes.
 ##
 ## Known keys (defaults in parentheses):
-##   run.base_ram (100)  run.overload_grace (3.0)  run.wave_base (40)  run.wave_step (5)
+##   run.base_ram (100)  run.overload_grace (3.0)  run.wave_base (50)  run.wave_step (5)
+##   run.streak_step (0.10)  run.streak_cap (5)  run.overtime_pay (1.5)
 ##   spawn.first_interval (2.8)  spawn.step (0.25)  spawn.min_interval (0.7)
 ##   popup.<id>.ram_cost | dismiss_reward | complete_reward | lifetime | weight | imp_complete_time
 ##   building.<id>.cost | max      building.cost_growth (0.5)

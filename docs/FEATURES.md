@@ -4,7 +4,7 @@ Written 2026-10-16 from the owner's question about selling huts and the pop-up r
 Each entry: the idea, whether it is actually a good idea, how to build it, and what it
 costs the harness. Ordered by the phases at the end, not by how exciting they are.
 
-## 0. Make training visible (legibility fix, do first)
+## 0. Make training visible (legibility fix, do first) — DONE 2026-10-16
 
 **Problem.** A dojo adds two training slots and the next two untrained imps flip to
 trained instantly, wherever they are. The only cues are a 16-pixel mortarboard and the
@@ -134,7 +134,7 @@ pressure beyond "which window". Thematic hooks write themselves.
 `WindowFrame`. Telemetry `ability` with id. External policy gains `ability:<id>` moves;
 greedy uses Task Manager when RAM is above 80% so bot batches reflect the feature.
 
-## 6. Completion streaks
+## 6. Completion streaks — DONE 2026-10-16
 
 **Verdict.** Yes, cheap, and it rewards exactly the behaviour the design wants.
 
@@ -147,7 +147,7 @@ competitive.
 (add a `manual` argument). Unit tests for build, cap and reset. Telemetry carries the
 streak on `popup_closed`.
 
-## 7. Imps that grow
+## 7. Imps that grow — DONE 2026-10-16
 
 **Verdict.** Yes. Makes early imps worth keeping and makes selling a hut hurt.
 
@@ -158,7 +158,7 @@ untrained rookie exists.
 **Implementation.** `Imp.closes` and a speed multiplier in `speed()`; drawn in `_draw`.
 Deterministic. Shows up in the per-wave table as a rising imp share.
 
-## 8. Overtime as a gamble
+## 8. Overtime as a gamble — DONE 2026-10-16
 
 **Verdict.** Yes, small. Today overtime is free points until you die.
 

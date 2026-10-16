@@ -24,10 +24,12 @@ static func base_interval(wave: int) -> float:
 	return maxf(floor_v, first - step * (wave - 1))
 
 
-## Seconds until the next spawn. interval_mult > 1 slows the schedule down.
-func next_interval(wave: int, interval_mult: float = 1.0) -> float:
+## Seconds until the next spawn. interval_mult > 1 slows the schedule down;
+## each overtime hour tightens it by RunState.OVERTIME_SPAWN_STEP.
+func next_interval(wave: int, interval_mult: float = 1.0, overtime_hours: int = 0) -> float:
 	var jitter := rng.randf_range(0.7, 1.3)
-	return base_interval(wave) * maxf(0.1, interval_mult) * jitter
+	var overtime := pow(RunState.OVERTIME_SPAWN_STEP, overtime_hours)
+	return base_interval(wave) * maxf(0.1, interval_mult) * overtime * jitter
 
 
 ## Weighted pick among the types available on this wave for this run's pool.

@@ -49,7 +49,7 @@ func _process(delta: float) -> void:
 	_timer -= delta
 	if _timer <= 0.0:
 		spawn(schedule.pick_type(run.wave, run.unlocked_popups, {"chat": run.chat_spawn_mult}))
-		_timer = schedule.next_interval(run.wave, run.interval_mult)
+		_timer = schedule.next_interval(run.wave, run.interval_mult, run.overtime_hours())
 
 
 ## Spawn later. `near` is a desktop position to cluster around (or null).

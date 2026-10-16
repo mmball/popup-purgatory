@@ -38,10 +38,11 @@ var achievements: Array[String] = []   ## sideways unlocks earned
 ## Records a finished run and returns the achievement ids newly earned.
 func record_run(run: RunState) -> Array[String]:
 	runs += 1
-	high_score = maxi(high_score, run.score)
+	var worth := run.final_score()
+	high_score = maxi(high_score, worth)
 	best_wave = maxi(best_wave, run.wave)
-	lifetime_bytes += run.score
-	bank += run.score
+	lifetime_bytes += worth
+	bank += worth
 	lifetime_closed += run.popups_closed
 	lifetime_completed += run.popups_completed
 	dojos_built += run.buildings_list.count("dojo")

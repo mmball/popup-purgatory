@@ -9,6 +9,7 @@ var _bytes: Label
 var _ram: Label
 var _wave: Label
 var _imps: Label
+var _streak: Label
 var _clock: Label
 var _tray: BevelPanel
 var _blink := 0.0
@@ -38,6 +39,7 @@ func _ready() -> void:
 	_ram = _readout(box, "RAM: 0/100", 130)
 	_wave = _readout(box, "Hour 1/8  0:50", 150)
 	_imps = _readout(box, "Imps: 0", 120)
+	_streak = _readout(box, "Streak: 0", 96)
 
 	_tray = BevelPanel.new(true)
 	_tray.size = Vector2(72, 22)
@@ -116,3 +118,5 @@ func update_from(run: RunState, imp_count: int, trained: int) -> void:
 		var s := int(ceil(run.wave_time_left))
 		_wave.text = "%s  %d:%02d" % [label, s / 60, s % 60]
 	_imps.text = "Imps: %d (%d trained)" % [imp_count, trained]
+	_streak.text = "Streak: %d" % run.streak if run.streak < RunState.STREAK_CAP else "Streak: %d MAX" % run.streak
+	_streak.add_theme_color_override("font_color", Color("b8860b") if run.streak >= 3 else Win98.BLACK)

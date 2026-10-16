@@ -6,6 +6,16 @@ var id := ""
 var def: Dictionary
 var _t := 0.0
 
+# dojo state (drawn as a sign and a progress bar)
+const DOJO_SLOTS := 2
+var graduates := 0           ## imps this dojo has trained
+var trainee: Node = null     ## the imp inside right now, or null
+var train_progress := 0.0    ## 0..1 while a trainee is inside
+
+
+func has_free_slot() -> bool:
+	return id == "dojo" and trainee == null and graduates < DOJO_SLOTS
+
 
 func _init(p_id: String = "hut") -> void:
 	id = p_id
@@ -14,7 +24,7 @@ func _init(p_id: String = "hut") -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	if id in ["ram", "antivirus", "coffee"]:
+	if id in ["ram", "antivirus", "coffee"] or (id == "dojo" and trainee != null):
 		queue_redraw()
 
 
@@ -31,6 +41,11 @@ func _draw() -> void:
 			draw_polygon(PackedVector2Array([Vector2(-20, -10), Vector2(0, -20), Vector2(20, -10)]), PackedColorArray([c]))
 			draw_polygon(PackedVector2Array([Vector2(-13, -20), Vector2(0, -28), Vector2(13, -20)]), PackedColorArray([c]))
 			draw_rect(Rect2(-3, -2, 6, 10), Color("3b1f0e"))
+			# sign: graduates so far; bar: the trainee inside
+			Win98.draw_text(self, Vector2(-16, -36), "%d/%d" % [graduates, DOJO_SLOTS], Color("ffd700"), 10, 32, HORIZONTAL_ALIGNMENT_CENTER)
+			if trainee != null:
+				draw_rect(Rect2(-16, -42, 32, 5), Color.BLACK)
+				draw_rect(Rect2(-15, -41, 30.0 * train_progress, 3), Color("7CFC00"))
 		"coffee":
 			draw_rect(Rect2(-14, -10, 28, 18), c)
 			draw_rect(Rect2(-16, -14, 32, 4), Color("f0f0f0"))
