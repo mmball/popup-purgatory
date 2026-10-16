@@ -71,10 +71,11 @@ static func _parse_dev_args() -> Dictionary:
 	for arg: String in OS.get_cmdline_user_args():
 		if not arg.begins_with("--"):
 			continue
-		var body := arg.substr(2).replace("-", "_")  # --max-wave and --max_wave both work
+		var body := arg.substr(2)
 		var eq := body.find("=")
+		# Keys accept - or _ (--max-wave and --max_wave are the same key); values are untouched.
 		if eq == -1:
-			out[body] = "1"
+			out[body.replace("-", "_")] = "1"
 		else:
-			out[body.substr(0, eq)] = body.substr(eq + 1)
+			out[body.substr(0, eq).replace("-", "_")] = body.substr(eq + 1)
 	return out

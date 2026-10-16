@@ -151,6 +151,8 @@ func _build_desktop() -> void:
 	quit.pressed.connect(func() -> void: get_tree().quit())
 	row.add_child(quit)
 
+	if str(Game.dev.get("ui", "")) == "unlocks":
+		_toggle_shop()
 	var hint := Label.new()
 	hint.text = "Controls: mouse. B or Start button opens the build menu, 1-7 picks a building, Esc cancels."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

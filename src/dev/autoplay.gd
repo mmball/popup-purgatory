@@ -103,7 +103,8 @@ func _process(delta: float) -> void:
 				_jsonl.close()
 			get_tree().quit()
 			return
-		if screen._t >= BsodScreen.ACCEPT_DELAY:
+		# --bsod-linger=S keeps the end screen up for S seconds so screenshots can see it.
+		if screen._t >= maxf(BsodScreen.ACCEPT_DELAY, float(Game.dev.get("bsod_linger", "0"))):
 			_click(Vector2(640, 360))  # any click leaves the BSOD
 	elif screen is MainMenu:
 		_step_menu(screen)
