@@ -51,6 +51,10 @@ func _ready() -> void:
 		if active:
 			start_menu.visible = false)
 	village.icon_activated.connect(_on_icon_activated)
+	village.demolish_requested.connect(func(cell: Vector2i) -> void: demolish(cell))
+	village.relocate_requested.connect(_relocate)
+	village.refund_preview = func(cell: Vector2i) -> int:
+		return BuildingCatalog.refund(village.buildings[cell].price_paid, run.in_break)
 	add_child(village)
 
 	popup_layer = Control.new()
@@ -78,7 +82,9 @@ func _ready() -> void:
 
 	start_menu = StartMenu.new()
 	start_menu.building_chosen.connect(_begin_place)
+	start_menu.demolish_requested.connect(_begin_demolish)
 	start_menu.shutdown_requested.connect(_ask_shutdown)
+	start_menu.visibility_changed.connect(func() -> void: village.show_rings = start_menu.visible)
 	add_child(start_menu)
 	start_menu.position = Vector2(2, DESKTOP_H - start_menu.size.y)
 
@@ -90,10 +96,12 @@ func _ready() -> void:
 	spawner = PopupSpawner.new()
 	spawner.setup(run, rng, popup_layer)
 	spawner.popup_spawned.connect(_wire_popup)
+	spawner.village = village
 	add_child(spawner)
 
 	imp_manager = ImpManager.new()
 	imp_manager.setup(run, rng, imp_layer, popup_layer)
+	imp_manager.village = village
 	imp_manager.training_started.connect(func(imp: Imp, dojo: Node2D) -> void:
 		_log("train_start", {"imp": imp.get_instance_id(), "closes": imp.closes})
 		_float("off to the dojo", imp.position + Vector2(0, -28), Color.WHITE, 11))
@@ -379,6 +387,7 @@ func _workday_end() -> void:
 	_log("clock_out", {"score": run.score, "tier": run.tier})
 	Sfx.play("fanfare", 1.0, 2.0, 0.0)
 	village.cancel_place()
+	village.cancel_demolish()
 	start_menu.visible = false
 	_banner("5:00 PM", Color("ffd700"))
 	_clockout = ConfirmDialog.new("It's 5:00 PM", "You survived the workday with %d bytes banked.\n\nOvertime pays 1.5x but spawns 10%% faster every hour, breaks offer one card, and if the machine crashes you keep the banked %d plus half of what you earned after." % [run.score, run.score])
@@ -399,6 +408,7 @@ func _workday_end() -> void:
 		else:
 			_log("overtime", {})
 			run.start_overtime()
+			village.set_relocate_enabled(false)
 			_banner("OVERTIME", Color("ff6060")))
 	add_child(_clockout)
 	_clockout.center_in_parent()
@@ -430,6 +440,8 @@ func _start_break() -> void:
 	break_dialog.show_choices(run.wave, choices)
 	break_dialog.center_in_parent()
 	village.cancel_place()
+	village.cancel_demolish()
+	village.set_relocate_enabled(true)  # drag buildings around for free until the break ends
 	start_menu.visible = false
 
 
@@ -446,6 +458,7 @@ func _on_upgrade_chosen(id: String) -> void:
 					p.set_close_button_size(run.close_button_size)
 	break_dialog.visible = false
 	run.end_break()
+	village.set_relocate_enabled(false)
 	_banner("HOUR %d" % run.wave, Color("ffd700"))
 
 
@@ -508,23 +521,22 @@ func _on_place_requested(id: String, cell: Vector2i) -> void:
 		village.set_affordable(true)
 
 
+## Places a building and applies its effect. Coffee carts and firewalls have no
+## global effect any more: carts speed imps per hut (ImpManager.speed_mult_for)
+## and firewalls are no-spawn zones the spawner reads from the village.
 func _build(id: String, cell: Vector2i, cost: int) -> void:
-	village.add_building(id, cell)
+	village.add_building(id, cell, cost)
 	run.buildings_built += 1
 	run.buildings_list.append(id)
 	_log("build", {"id": id, "cell": [cell.x, cell.y], "cost": cost, "bytes_after": run.bytes, "owned_after": village.count(id)})
 	var at := village.cell_center(cell)
 	match id:
 		"hut":
-			imp_manager.spawn_imp(at + Vector2(0, 18))
+			imp_manager.spawn_imp(at + Vector2(0, 18), cell)
 		"dojo":
 			imp_manager.add_dojo(village.buildings[cell])
-		"coffee":
-			run.imp_speed_mult *= 1.25
 		"ram":
 			run.set_ram_max(run.ram_max + 32)
-		"firewall":
-			run.interval_mult *= 1.15
 		"antivirus":
 			run.timeouts_multiply = false
 		"shrine":
@@ -536,6 +548,78 @@ func _build(id: String, cell: Vector2i, cost: int) -> void:
 	if cost > 0:
 		_float("-%d" % cost, at, Color("ffd700"), 13)
 		Sfx.play("chime", 0.7)
+
+
+var _demolish_hint_shown := false
+
+
+func _begin_demolish() -> void:
+	start_menu.visible = false
+	if _ended or village.buildings.is_empty():
+		return
+	village.begin_demolish()
+	if not _demolish_hint_shown:
+		_demolish_hint_shown = true
+		_float("Click a building to sell it. Right-click to stop.", Vector2(640, 150), Color.WHITE, 15, 30.0, 3.0)
+
+
+## Sells the building at `cell`, reversing _build's effect and refunding part of
+## the price (BuildingCatalog.refund). Public: the bot's external policy calls it.
+## Returns false, with a float saying why, when nothing was sold.
+func demolish(cell: Vector2i) -> bool:
+	if _ended or run.crashed_flag:
+		return false
+	var b: Building = village.buildings.get(cell)
+	var at := village.cell_center(cell)
+	if b == null:
+		_float("nothing to sell there", at, Color("ff6060"), 12)
+		return false
+	var id := b.id
+	if id == "ram" and run.ram_used > run.ram_max - 32:
+		_float("would crash!", at, Color("ff6060"), 13)
+		return false
+	match id:
+		"hut":
+			var fired := imp_manager.fire_from_hut(cell)
+			if fired != null:
+				_float("fired", fired.position + Vector2(0, -28), Color("ff6060"), 11)
+		"dojo":
+			imp_manager.remove_dojo(b)
+		"coffee", "firewall":
+			pass  # local effects go with the building
+		"ram":
+			run.set_ram_max(run.ram_max - 32)
+		"antivirus":
+			run.timeouts_multiply = not ("antivirus_patch" in run.upgrades_picked)
+		"shrine":
+			run.click_bonus -= 1
+		"helpdesk":
+			run.helpdesk = false
+		"screensaver":
+			spawner.screensaver = false
+	var refund := BuildingCatalog.refund(b.price_paid, run.in_break)
+	run.bytes += refund  # a refund is not score, so not add_bytes
+	run.bytes_changed.emit(run.bytes)
+	run.buildings_list.erase(id)
+	village.remove_building(cell)
+	_log("demolish", {"id": id, "cell": [cell.x, cell.y], "refund": refund, "bytes_after": run.bytes, "owned_after": village.count(id)})
+	_float("+%d" % refund, at, Color("ffd700"), 13)
+	Sfx.play("chime", 0.5)
+	if village.buildings.is_empty():
+		village.cancel_demolish()
+	return true
+
+
+## A building was dragged to a free cell during a break (Village handles the
+## drag; relocation is free). Huts take their imps with them.
+func _relocate(from: Vector2i, to: Vector2i) -> void:
+	var b: Building = village.buildings.get(from)
+	if b == null or not village.move_building(from, to):
+		return
+	if b.id == "hut":
+		imp_manager.rehome(from, to, village.cell_center(to) + Vector2(0, 18))
+	_log("relocate", {"id": b.id, "from": [from.x, from.y], "to": [to.x, to.y]})
+	_float("moved", village.cell_center(to), Color.WHITE, 12)
 
 
 func _on_icon_activated(kind: String) -> void:
@@ -600,6 +684,8 @@ func _end(reason: String) -> void:
 	_ended = true
 	set_process(false)
 	spawner.active = false
+	village.cancel_demolish()
+	village.set_relocate_enabled(false)
 	run.crash_reason = reason
 	var summary := run.summary()
 	summary.erase("waves")
@@ -629,12 +715,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key: InputEventKey = event
 	if key.keycode == KEY_ESCAPE:
-		if village.is_placing():
+		if village.is_busy():
 			village.cancel_place()
+			village.cancel_demolish()
 		start_menu.visible = false
 		get_viewport().set_input_as_handled()
 	elif key.keycode == KEY_B:
 		_toggle_start_menu()
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_D:
+		_begin_demolish()
 		get_viewport().set_input_as_handled()
 	elif key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var idx := int(key.keycode - KEY_1)

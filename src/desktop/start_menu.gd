@@ -4,13 +4,16 @@ extends Control
 ## current price; the last item ends the run.
 
 signal building_chosen(id: String)
+signal demolish_requested
 signal shutdown_requested
 
 const WIDTH := 300
 const ITEM_H := 28
 const BAND_W := 24
+const DEMOLISH_HOTKEY := "D"
 
-var _items: Array[Button] = []
+var _items: Array[Button] = []   ## building items only, indexed like the ids passed to _rebuild
+var _demolish: MenuItem           ## "Demolish...", below the buildings and above the separator
 var _run: RunState
 var _village: Village
 
@@ -79,6 +82,15 @@ func _rebuild(ids: Array[String]) -> void:
 		add_child(item)
 		_items.append(item)
 		y += ITEM_H
+	_demolish = MenuItem.new()
+	_demolish.caption = "Demolish..."
+	_demolish.hotkey = DEMOLISH_HOTKEY
+	_demolish.tooltip_text = "Sell a building for half what you paid (three quarters on a break)."
+	_demolish.position = Vector2(BAND_W + 2, y)
+	_demolish.size = Vector2(WIDTH - BAND_W - 4, ITEM_H)
+	_demolish.pressed.connect(func() -> void: demolish_requested.emit())
+	add_child(_demolish)
+	y += ITEM_H
 	y += 8
 	var shutdown := MenuItem.new()
 	shutdown.caption = "Shut Down..."
@@ -87,8 +99,10 @@ func _rebuild(ids: Array[String]) -> void:
 	shutdown.pressed.connect(func() -> void: shutdown_requested.emit())
 	add_child(shutdown)
 	y += ITEM_H + 4
-	size = Vector2(WIDTH, y)
-	custom_minimum_size = size
+	# minimum first: a Control's size cannot drop below its custom minimum, so
+	# the old order left the menu stuck at its tallest rebuild.
+	custom_minimum_size = Vector2(WIDTH, y)
+	size = custom_minimum_size
 	queue_redraw()
 
 
@@ -109,6 +123,8 @@ func refresh(run: RunState, village: Village) -> void:
 			item.detail = "%d B   x%d" % [cost, owned]
 		item.disabled = maxed or run.bytes < cost
 		item.queue_redraw()
+	_demolish.disabled = village.buildings.is_empty()
+	_demolish.queue_redraw()
 
 
 func _draw() -> void:
@@ -118,7 +134,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2(5, size.y - 10), -PI / 2, Vector2.ONE)
 	Win98.draw_text(self, Vector2.ZERO, "Popup Purgatory 98", Win98.GRAY, 14)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	# separator above Shut Down
-	var sep_y := 4 + _items.size() * ITEM_H + 3
+	# separator above Shut Down (building items plus the Demolish item)
+	var sep_y := 4 + (_items.size() + 1) * ITEM_H + 3
 	draw_rect(Rect2(BAND_W + 4, sep_y, size.x - BAND_W - 8, 1), Win98.GRAY_DARK)
 	draw_rect(Rect2(BAND_W + 4, sep_y + 1, size.x - BAND_W - 8, 1), Win98.WHITE)

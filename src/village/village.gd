@@ -18,6 +18,10 @@ var buildings := {}            ## Vector2i -> Building
 var placing_id := ""
 var demolishing := false
 var relocate_enabled := false  ## true during breaks: drag a building to move it
+var show_rings := false:       ## radius rings while the Start menu is open
+	set(v):
+		show_rings = v
+		queue_redraw()
 var refund_preview: Callable   ## (cell) -> int, set by Desktop for the demolish label
 var _drag_from := Vector2i(-1, -1)
 var reserved: Array[Vector2i] = [Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)]
@@ -279,7 +283,7 @@ func _draw_rings() -> void:
 
 
 func _draw() -> void:
-	if not is_busy() and not relocate_enabled:
+	if not is_busy() and not relocate_enabled and not show_rings:
 		return
 	_draw_rings()
 	if demolishing:

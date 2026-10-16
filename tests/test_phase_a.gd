@@ -77,19 +77,28 @@ func test_dojo_slots_and_trainee_choice() -> void:
 	dojo.graduates = Building.DOJO_SLOTS
 	assert_false(dojo.has_free_slot(), "full dojo")
 	dojo.graduates = 0
+	dojo.cell = Vector2i(5, 5)
+	dojo.position = Vector2.ZERO
 	var mgr := ImpManager.new()
 	var near := Imp.new()
 	near.position = Vector2(10, 0)
+	near.home_cell = Vector2i(6, 5)   # one cell from the dojo
 	var far := Imp.new()
 	far.position = Vector2(500, 0)
+	far.home_cell = Vector2i(3, 7)    # two cells away: still in a radius-2 dojo's reach
 	var trained := Imp.new()
 	trained.position = Vector2(0, 0)
 	trained.trained = true
-	mgr.imps = [near, far, trained]
-	assert_eq(mgr.pick_trainee(Vector2.ZERO), near, "nearest untrained idle imp")
+	var out_of_range := Imp.new()
+	out_of_range.position = Vector2(1, 0)  # closest in pixels, but its hut is 3 cells off
+	out_of_range.home_cell = Vector2i(8, 5)
+	mgr.imps = [near, far, trained, out_of_range]
+	assert_eq(mgr.pick_trainee(dojo), near, "nearest untrained idle imp homed within the dojo radius")
 	near.state = Imp.State.WORK
-	assert_eq(mgr.pick_trainee(Vector2.ZERO), far, "working imps are skipped")
+	assert_eq(mgr.pick_trainee(dojo), far, "working imps are skipped")
 	far.state = Imp.State.TRAIN
-	assert_eq(mgr.pick_trainee(Vector2.ZERO), null, "nobody left")
-	for n: Node in [near, far, trained, dojo, mgr]:
+	assert_eq(mgr.pick_trainee(dojo), null, "nobody left: the imp homed 3 cells away is never picked")
+	out_of_range.home_cell = Vector2i(-1, -1)
+	assert_eq(mgr.pick_trainee(dojo), out_of_range, "a stray with no hut trains anywhere")
+	for n: Node in [near, far, trained, out_of_range, dojo, mgr]:
 		n.free()

@@ -280,7 +280,7 @@ func _apply_external_move(desktop: Desktop, move_id: String, moves: Array) -> vo
 		"sell":
 			var xy := parts[1].split(",")
 			if xy.size() == 2:
-				desktop.call("demolish", Vector2i(int(xy[0]), int(xy[1])))  # call(): Desktop.demolish lands with the desktop change
+				desktop.demolish(Vector2i(int(xy[0]), int(xy[1])))
 		"pick":
 			for b: Win98Button in _find_all(desktop.break_dialog, _is_win98_button):
 				var card := b.get_parent().get_parent()

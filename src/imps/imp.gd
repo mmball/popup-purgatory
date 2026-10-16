@@ -3,7 +3,7 @@ extends Node2D
 ## A little worker. Idles near its home, walks to a pop-up, stands on its X
 ## button for a moment, then closes it. Trained imps complete instead of dismiss.
 
-enum State { IDLE, SEEK, WORK, TRAIN }
+enum State { IDLE, SEEK, WORK, TRAIN, LEAVE }
 
 const BASE_SPEED := 90.0
 const DISMISS_TIME := 0.6
@@ -12,11 +12,14 @@ const TRAIN_TIME := 6.0
 const XP_STEP := 0.02        ## speed per close
 const XP_CAP := 15           ## closes that count
 const VETERAN_CLOSES := 10
+const DESK_SIZE := Vector2(1280, 720)
+const LEAVE_MARGIN := 30.0   ## px past the desk edge where a fired imp is gone
 
 var manager: Node          ## ImpManager
 var run: RunState
 var rng: RandomNumberGenerator   ## the run's RNG, handed down by ImpManager
 var home := Vector2.ZERO
+var home_cell := Vector2i(-1, -1)   ## the hut this imp came from; strays (upgrades) keep (-1, -1)
 var trained := false:
 	set(v):
 		trained = v
@@ -38,6 +41,7 @@ var dojo: Node2D          ## the dojo being walked to / trained in (TRAIN state)
 var _train_left := 0.0
 var _alert_t := 0.0       ## seconds left to draw the "!" after acquiring a target
 var _sulk_t := 0.0        ## seconds left to draw the frown after being dodged
+var _leave_target := Vector2.ZERO   ## off-screen point walked to in LEAVE state
 
 
 func _ready() -> void:
@@ -46,9 +50,67 @@ func _ready() -> void:
 	z_index = 5
 
 
+## Base speed times the run-wide multiplier (upgrades, meta perks), the local
+## coffee-cart multiplier for this imp's hut, and experience.
 func speed() -> float:
 	var m := run.imp_speed_mult if run != null else 1.0
-	return Tuning.num("imp.base_speed", BASE_SPEED) * m * xp_mult()
+	var local: float = manager.speed_mult_for(self) if manager != null else 1.0
+	return Tuning.num("imp.base_speed", BASE_SPEED) * m * local * xp_mult()
+
+
+## Fired (its hut was demolished): drop whatever it was doing and walk off the
+## nearest desk edge. The manager is told once it is gone.
+func leave() -> void:
+	if state == State.LEAVE:
+		return
+	if state == State.SEEK or state == State.WORK:
+		if manager != null:
+			manager.release(self)
+		target = null
+	elif state == State.TRAIN:
+		_clear_dojo()
+	visible = true
+	state = State.LEAVE
+	var to_left := position.x
+	var to_right := DESK_SIZE.x - position.x
+	var to_top := position.y
+	var to_bottom := DESK_SIZE.y - position.y
+	var nearest := minf(minf(to_left, to_right), minf(to_top, to_bottom))
+	if nearest == to_left:
+		_leave_target = Vector2(-LEAVE_MARGIN, position.y)
+	elif nearest == to_right:
+		_leave_target = Vector2(DESK_SIZE.x + LEAVE_MARGIN, position.y)
+	elif nearest == to_top:
+		_leave_target = Vector2(position.x, -LEAVE_MARGIN)
+	else:
+		_leave_target = Vector2(position.x, DESK_SIZE.y + LEAVE_MARGIN)
+
+
+func _leave(delta: float) -> void:
+	if _move_toward(_leave_target, speed(), delta) <= ARRIVE_DIST:
+		if manager != null:
+			manager.call("on_imp_left", self)
+		queue_free()
+
+
+## The dojo was demolished mid-training: step back out untrained and idle.
+func abort_training() -> void:
+	if state != State.TRAIN:
+		return
+	if is_instance_valid(dojo) and not visible:
+		position = dojo.position + Vector2(0, 14)
+	_clear_dojo()
+	visible = true
+	state = State.IDLE
+	_retarget_timer = 0.0
+
+
+func _clear_dojo() -> void:
+	if is_instance_valid(dojo) and dojo.get("trainee") == self:
+		dojo.set("trainee", null)
+		dojo.set("train_progress", 0.0)
+	dojo = null
+	_train_left = 0.0
 
 
 func xp_mult() -> float:
@@ -111,6 +173,8 @@ func _process(delta: float) -> void:
 			_work(delta)
 		State.TRAIN:
 			_train(delta)
+		State.LEAVE:
+			_leave(delta)
 	queue_redraw()
 
 
@@ -223,8 +287,8 @@ func _draw() -> void:
 	draw_circle(bc + Vector2(3, -1) + eo, 2.2, Color.WHITE)
 	draw_circle(bc + Vector2(-3, -1) + eo * 1.8, 1.0, Color.BLACK)
 	draw_circle(bc + Vector2(3, -1) + eo * 1.8, 1.0, Color.BLACK)
-	# grin, or a frown while sulking after a dodge
-	if _sulk_t > 0.0:
+	# grin, or a frown while sulking after a dodge or walking off fired
+	if _sulk_t > 0.0 or state == State.LEAVE:
 		draw_arc(bc + Vector2(0, 5), 3.5, PI + 0.2, TAU - 0.2, 8, Color.BLACK, 1.0)
 	else:
 		draw_arc(bc + Vector2(0, 2), 3.5, 0.2, PI - 0.2, 8, Color.BLACK, 1.0)
